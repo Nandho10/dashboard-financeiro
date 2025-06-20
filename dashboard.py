@@ -12,6 +12,106 @@ import os
 
 st.set_page_config(page_title="DashBoard", layout="wide")
 
+# --- CSS GLOBAL PARA TEMA ESCURO E ELEGANTE ---
+# st.markdown("""
+#     <style>
+#     /* Fundo geral e containers principais */
+#     body, .stApp, .block-container, .main {
+#         background-color: #181c2f !important;
+#     }
+#     .block-container, .main, .stApp {
+#         box-shadow: none !important;
+#         border: none !important;
+#         padding-left: 0 !important;
+#         padding-right: 0 !important;
+#         margin-left: 0 !important;
+#         margin-right: 0 !important;
+#     }
+#     /* Menu ocupa 100% do container principal, centralizado */
+#     div[data-testid=\"horizontal-menu\"] {
+#         width: 100% !important;
+#         min-width: 0 !important;
+#         max-width: 100% !important;
+#         margin-left: 0 !important;
+#         margin-right: 0 !important;
+#         left: 0 !important;
+#         right: 0 !important;
+#         background: #181c2f !important;
+#         border-radius: 8px !important;
+#         box-shadow: none !important;
+#         z-index: 100;
+#         display: flex !important;
+#         justify-content: center !important;
+#     }
+#     /* Força fundo escuro no container do menu para eliminar área branca (seletor ultra-específico) */
+#     div[data-testid=\"horizontal-menu\"] > div.container-xxl.d-flex.flex-column.flex-shrink-0.p-h.nav-justified {
+#         background: #181c2f !important;
+#         background-color: #181c2f !important;
+#         box-shadow: none !important;
+#         border-radius: 8px !important;
+#     }
+#     div[data-testid=\"horizontal-menu\"] .container-xxl {
+#         background: #181c2f !important;
+#         background-color: #181c2f !important;
+#         box-shadow: none !important;
+#     }
+#     /* Inputs e selects */
+#     .stSelectbox, .stMultiSelect, .stTextInput, .stNumberInput, .stDateInput, .stSlider, .stRadio, .stCheckbox {
+#         background-color: #232526 !important;
+#         color: #f5f6fa !important;
+#         border-radius: 8px !important;
+#         border: 1px solid #333 !important;
+#     }
+#     /* Itens internos dos selects */
+#     .stSelectbox div, .stMultiSelect div, .stTextInput input, .stMultiSelect input {
+#         background-color: #232526 !important;
+#         color: #f5f6fa !important;
+#     }
+#     /* Botão de remover item do multiselect */
+#     .stMultiSelect .css-1gtu0rj, .stMultiSelect .css-12jo7m5 {
+#         background: #414345 !important;
+#         color: #fff !important;
+#     }
+#     /* Expander */
+#     .stExpander, .stExpanderHeader, .stExpanderContent {
+#         background-color: #232526 !important;
+#         color: #f5f6fa !important;
+#         border-radius: 8px !important;
+#     }
+#     </style>
+# """, unsafe_allow_html=True)
+
+# --- EXEMPLO DE AJUSTE DE TEMA ESCURO PARA GRÁFICOS PLOTLY ---
+# (Aplique este layout em todos os gráficos principais do dashboard)
+def aplicar_tema_escuro_plotly(fig):
+    fig.update_layout(
+        plot_bgcolor='#181c2f',
+        paper_bgcolor='#181c2f',
+        font=dict(color='#f5f6fa'),
+        xaxis=dict(
+            showgrid=True,
+            gridcolor='rgba(255,255,255,0.07)',
+            zeroline=False,
+            showline=False,
+            tickfont=dict(color='#b0b0b0'),
+        ),
+        yaxis=dict(
+            showgrid=True,
+            gridcolor='rgba(255,255,255,0.07)',
+            zeroline=False,
+            showline=False,
+            tickfont=dict(color='#b0b0b0')
+        ),
+        legend=dict(
+            font=dict(color='#f5f6fa')
+        )
+    )
+    return fig
+
+# Exemplo de uso:
+# fig = aplicar_tema_escuro_plotly(fig)
+# st.plotly_chart(fig, use_container_width=True)
+
 # Ícone de finanças (exemplo: 💰)
 st.markdown("## 💰 Análise Descritiva de Finanças Pessoais")
 
@@ -30,6 +130,39 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# --- CSS para cartões sóbrios e elegantes ---
+st.markdown("""
+    <style>
+    .card-fixo {
+        min-height: 110px;
+        height: 110px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: flex-start;
+        text-align: left;
+        padding: 20px 28px 20px 28px;
+        border-radius: 18px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.10);
+        margin-bottom: 8px;
+    }
+    .card-fixo h4 {
+        margin: 0 0 8px 0;
+        font-weight: 400;
+        font-size: 1.05rem;
+        letter-spacing: 0.5px;
+        color: #b0b0b0;
+    }
+    .card-fixo h2 {
+        margin: 0;
+        font-size: 2.2rem;
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: 1px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- SISTEMA DE NAVEGAÇÃO ---
 selected = option_menu(
     menu_title=None,
@@ -38,10 +171,10 @@ selected = option_menu(
     orientation="horizontal",
     default_index=0,
     styles={
-        "container": {"padding": "0!important", "background-color": "#fafafa", "margin-left": "0", "margin-right": "0"},
-        "icon": {"color": "#185a9d", "font-size": "18px"},
-        "nav-link": {"font-size": "16px", "margin": "0 10px", "color": "#185a9d"},
-        "nav-link-selected": {"background-color": "#185a9d", "color": "#fff"},
+        "container": {"padding": "0!important", "background-color": "#181c2f", "margin-left": "0", "margin-right": "0", "border-radius": "8px", "box-shadow": "0 2px 12px rgba(0,0,0,0.10)", "width": "100%", "display": "flex", "justify-content": "center", "align-items": "center", "flex-wrap": "nowrap", "overflow": "hidden"},
+        "icon": {"color": "#b0b0b0", "font-size": "18px"},
+        "nav-link": {"font-size": "16px", "margin": "0 2px", "color": "#f5f6fa", "background-color": "#232526", "border-radius": "4px", "flex": "1 1 0", "text-align": "center", "display": "flex", "flex-direction": "column", "align-items": "center", "justify-content": "center", "height": "52px", "white-space": "nowrap", "overflow": "hidden", "text-overflow": "ellipsis", "min-width": "0"},
+        "nav-link-selected": {"background-color": "#414345", "color": "#fff", "font-weight": "bold", "border-radius": "4px", "flex": "1 1 0", "text-align": "center", "display": "flex", "flex-direction": "column", "align-items": "center", "justify-content": "center", "height": "52px", "white-space": "nowrap", "overflow": "hidden", "text-overflow": "ellipsis", "min-width": "0"},
     }
 )
 
@@ -57,80 +190,99 @@ abas = xls.sheet_names
 
 # Sidebar para filtros
 with st.sidebar:
-    st.header('Filtros')
-    st.write('Selecione os filtros desejados abaixo:')
-    
-    # Botão para redefinir filtros
-    if 'reset_filtros' not in st.session_state:
-        st.session_state['reset_filtros'] = False
+    with st.expander('Filtros Gerais', expanded=False):
+        st.header('Filtros')
+        st.write('Selecione os filtros desejados abaixo:')
+        if 'reset_filtros' not in st.session_state:
+            st.session_state['reset_filtros'] = False
+        # Lê a aba 'Conta' para obter as opções de contas
+        df_conta = pd.read_excel(xls, sheet_name='Conta')
+        contas = df_conta['Contas'].dropna().unique().tolist()
+
+        # Filtro de tipo de análise com multiselect
+        tipos_opcoes = ['Receitas', 'Despesas']
+        if st.session_state['reset_filtros']:
+            tipos_selecionados = st.multiselect('Tipo de análise', tipos_opcoes, default=tipos_opcoes, key='tipo_filtro_reset')
+        else:
+            tipos_selecionados = st.multiselect('Tipo de análise', tipos_opcoes, default=tipos_opcoes, key='tipo_filtro')
+
+        # Filtro de conta com opção 'Todas'
+        contas_opcoes = ['Todas'] + contas
+        if st.session_state['reset_filtros']:
+            conta_selecionada = st.selectbox('Conta', contas_opcoes, index=0, key='conta_filtro_reset')
+        else:
+            conta_selecionada = st.selectbox('Conta', contas_opcoes, key='conta_filtro')
+
+        # Filtro dinâmico de categoria
+        if 'Receitas' in tipos_selecionados:
+            df_cat = pd.read_excel(xls, sheet_name='Receitas Categoria')
+            categorias = df_cat['SUBCATEGORIA'].dropna().unique().tolist()
+        else:
+            df_cat = pd.read_excel(xls, sheet_name='Despesas Categoria')
+            categorias = df_cat.columns.tolist()
+
+        # Filtro de categoria com opção 'Todas'
+        categorias_opcoes = ['Todas'] + categorias
+        if st.session_state['reset_filtros']:
+            categoria_selecionada = st.selectbox('Categoria', categorias_opcoes, index=0, key='cat_filtro_reset')
+        else:
+            categoria_selecionada = st.selectbox('Categoria', categorias_opcoes, key='cat_filtro')
+
+        # Filtros de tempo extraindo Ano e Mês da coluna 'DATA'
+        if 'Receitas' in tipos_selecionados:
+            df_dados = pd.read_excel(xls, sheet_name='Receitas')
+        else:
+            df_dados = pd.read_excel(xls, sheet_name='Despesas')
+
+        # Garante que a coluna DATA está em formato datetime
+        df_dados['DATA'] = pd.to_datetime(df_dados['DATA'], errors='coerce')
+        df_dados = df_dados.dropna(subset=['DATA'])
+        df_dados['Ano'] = df_dados['DATA'].dt.year.astype(str)
+
+        # Lista de meses em ordem cronológica (abreviações em português)
+        meses_ordem = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
+        # Ajusta o nome dos meses para português, se necessário
+        df_dados['Mês'] = df_dados['DATA'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
+
+        # Filtro de ano com multiselect
+        anos = df_dados['Ano'].dropna().unique().tolist()
+        if st.session_state['reset_filtros']:
+            anos_selecionados = st.multiselect('Ano', sorted(anos, reverse=True), default=sorted(anos, reverse=True), key='ano_filtro_reset')
+        else:
+            anos_selecionados = st.multiselect('Ano', sorted(anos, reverse=True), default=sorted(anos, reverse=True), key='ano_filtro')
+
+        # Filtro de mês com multiselect
+        meses = [m for m in meses_ordem if m in df_dados['Mês'].unique()]
+        if st.session_state['reset_filtros']:
+            meses_selecionados = st.multiselect('Mês', meses, default=meses, key='mes_filtro_reset')
+        else:
+            meses_selecionados = st.multiselect('Mês', meses, default=meses, key='mes_filtro')
+
+    # Só mostra o expander de vendas se a aba Vendas estiver selecionada
+    if selected == 'Vendas':
+        df_vendas = pd.read_excel(xls, sheet_name='Vendas')
+        df_vendas['DATA'] = pd.to_datetime(df_vendas['DATA'], errors='coerce')
+        df_vendas = df_vendas.dropna(subset=['DATA'])
+        df_vendas['Ano'] = df_vendas['DATA'].dt.year.astype(str)
+        df_vendas['Mês'] = df_vendas['DATA'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
+        with st.expander('Filtros de Vendas', expanded=True):
+            anos_vendas = df_vendas['Ano'].dropna().unique().tolist()
+            anos_vendas_sel = st.multiselect('Ano (Vendas)', sorted(anos_vendas, reverse=True), default=sorted(anos_vendas, reverse=True), key='ano_vendas')
+            meses_ordem = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+            meses_vendas = [m for m in meses_ordem if m in df_vendas['Mês'].unique()]
+            meses_vendas_sel = st.multiselect('Mês (Vendas)', meses_vendas, default=meses_vendas, key='mes_vendas')
+            contas_vendas = ['Todas'] + df_vendas['CONTA'].dropna().unique().tolist()
+            conta_vendas_sel = st.selectbox('Conta (Vendas)', contas_vendas, key='conta_vendas')
+            tipos_receb = ['Todos'] + df_vendas['TIPO DE RECEBIMENTO'].dropna().unique().tolist()
+            tipo_receb_sel = st.selectbox('Tipo de Recebimento', tipos_receb, key='tipo_receb_vendas')
+            pago_opcoes = ['Todos', 'Sim', 'Não']
+            pago_sel = st.selectbox('Pago?', pago_opcoes, key='pago_vendas')
+    st.markdown('---')
     if st.button('Redefinir Filtros'):
         st.session_state['reset_filtros'] = True
     else:
         st.session_state['reset_filtros'] = False
-
-    # Lê a aba 'Conta' para obter as opções de contas
-    df_conta = pd.read_excel(xls, sheet_name='Conta')
-    contas = df_conta['Contas'].dropna().unique().tolist()
-
-    # Filtro de tipo de análise com multiselect
-    tipos_opcoes = ['Receitas', 'Despesas']
-    if st.session_state['reset_filtros']:
-        tipos_selecionados = st.multiselect('Tipo de análise', tipos_opcoes, default=tipos_opcoes, key='tipo_filtro_reset')
-    else:
-        tipos_selecionados = st.multiselect('Tipo de análise', tipos_opcoes, default=tipos_opcoes, key='tipo_filtro')
-
-    # Filtro de conta com opção 'Todas'
-    contas_opcoes = ['Todas'] + contas
-    if st.session_state['reset_filtros']:
-        conta_selecionada = st.selectbox('Conta', contas_opcoes, index=0, key='conta_filtro_reset')
-    else:
-        conta_selecionada = st.selectbox('Conta', contas_opcoes, key='conta_filtro')
-
-    # Filtro dinâmico de categoria
-    if 'Receitas' in tipos_selecionados:
-        df_cat = pd.read_excel(xls, sheet_name='Receitas Categoria')
-        categorias = df_cat['SUBCATEGORIA'].dropna().unique().tolist()
-    else:
-        df_cat = pd.read_excel(xls, sheet_name='Despesas Categoria')
-        categorias = df_cat.columns.tolist()
-
-    # Filtro de categoria com opção 'Todas'
-    categorias_opcoes = ['Todas'] + categorias
-    if st.session_state['reset_filtros']:
-        categoria_selecionada = st.selectbox('Categoria', categorias_opcoes, index=0, key='cat_filtro_reset')
-    else:
-        categoria_selecionada = st.selectbox('Categoria', categorias_opcoes, key='cat_filtro')
-
-    # Filtros de tempo extraindo Ano e Mês da coluna 'DATA'
-    if 'Receitas' in tipos_selecionados:
-        df_dados = pd.read_excel(xls, sheet_name='Receitas')
-    else:
-        df_dados = pd.read_excel(xls, sheet_name='Despesas')
-
-    # Garante que a coluna DATA está em formato datetime
-    df_dados['DATA'] = pd.to_datetime(df_dados['DATA'], errors='coerce')
-    df_dados = df_dados.dropna(subset=['DATA'])
-    df_dados['Ano'] = df_dados['DATA'].dt.year.astype(str)
-
-    # Lista de meses em ordem cronológica (abreviações em português)
-    meses_ordem = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-
-    # Ajusta o nome dos meses para português, se necessário
-    df_dados['Mês'] = df_dados['DATA'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
-
-    # Filtro de ano com multiselect
-    anos = df_dados['Ano'].dropna().unique().tolist()
-    if st.session_state['reset_filtros']:
-        anos_selecionados = st.multiselect('Ano', sorted(anos, reverse=True), default=sorted(anos, reverse=True), key='ano_filtro_reset')
-    else:
-        anos_selecionados = st.multiselect('Ano', sorted(anos, reverse=True), default=sorted(anos, reverse=True), key='ano_filtro')
-
-    # Filtro de mês com multiselect
-    meses = [m for m in meses_ordem if m in df_dados['Mês'].unique()]
-    if st.session_state['reset_filtros']:
-        meses_selecionados = st.multiselect('Mês', meses, default=meses, key='mes_filtro_reset')
-    else:
-        meses_selecionados = st.multiselect('Mês', meses, default=meses, key='mes_filtro')
 
 # --- CÁLCULO DOS INDICADORES BÁSICOS ---
 
@@ -186,46 +338,29 @@ percentual = (abs(valor_despesas) / valor_recebidos * 100) if valor_recebidos > 
 def format_brl(valor):
     return f"R$ {valor:,.2f}".replace(",", "v").replace(".", ",").replace("v", ".")
 
-# --- EXIBIÇÃO DOS CARDS ---
-# CSS para altura fixa dos cards, centralização do valor e título à esquerda no topo
-st.markdown("""
-    <style>
-    .card-fixo {
-        min-height: 140px;
-        height: 140px;
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-start;
-        align-items: flex-start;
-        text-align: left;
-        padding: 18px 20px 20px 20px;
-    }
-    .card-fixo h4 {
-        margin: 0 0 12px 2px;
-        font-weight: 500;
-        font-size: 1.05rem;
-        letter-spacing: 0.5px;
-    }
-    .card-fixo h2 {
-        margin: 0 auto;
-        font-size: 2.1rem;
-        font-weight: 700;
-        align-self: center;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-st.markdown('---')
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    st.markdown(f"<div class='card-fixo' style='background: linear-gradient(90deg, #43cea2 0%, #185a9d 100%); border-radius:10px; color:white;'><h4>Saldo</h4><h2>{format_brl(saldo)}</h2></div>", unsafe_allow_html=True)
-with col2:
-    st.markdown(f"<div class='card-fixo' style='background: linear-gradient(90deg, #11998e 0%, #38ef7d 100%); border-radius:10px; color:white;'><h4>Recebidos</h4><h2>{format_brl(valor_recebidos)}</h2></div>", unsafe_allow_html=True)
-with col3:
-    st.markdown(f"<div class='card-fixo' style='background: linear-gradient(90deg, #fc6076 0%, #ff9a44 100%); border-radius:10px; color:white;'><h4>Despesas</h4><h2>{format_brl(abs(valor_despesas))}</h2></div>", unsafe_allow_html=True)
-with col4:
-    st.markdown(f"<div class='card-fixo' style='background: linear-gradient(90deg, #f7971e 0%, #ffd200 100%); border-radius:10px; color:white;'><h4>% Desp/Receb</h4><h2>{percentual:.1f}%</h2></div>", unsafe_allow_html=True)
+# Exibe cards principais apenas se não estiver na aba Vendas
+if selected != 'Vendas':
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.markdown(f"""<div class='card-fixo' style='background: linear-gradient(90deg, #232526 0%, #414345 100%);'>
+            <h4>Saldo</h4>
+            <h2>{format_brl(saldo)}</h2>
+        </div>""", unsafe_allow_html=True)
+    with col2:
+        st.markdown(f"""<div class='card-fixo' style='background: linear-gradient(90deg, #283E51 0%, #485563 100%);'>
+            <h4>Recebidos</h4>
+            <h2>{format_brl(valor_recebidos)}</h2>
+        </div>""", unsafe_allow_html=True)
+    with col3:
+        st.markdown(f"""<div class='card-fixo' style='background: linear-gradient(90deg, #373B44 0%, #4286f4 100%);'>
+            <h4>Despesas</h4>
+            <h2>{format_brl(abs(valor_despesas))}</h2>
+        </div>""", unsafe_allow_html=True)
+    with col4:
+        st.markdown(f"""<div class='card-fixo' style='background: linear-gradient(90deg, #232526 0%, #757F9A 100%);'>
+            <h4>% Desp/Receb</h4>
+            <h2>{percentual:.1f}%</h2>
+        </div>""", unsafe_allow_html=True)
 
 if selected == "Visão Geral":
     # --- GRÁFICOS DE ROSCA LADO A LADO ---
@@ -262,6 +397,7 @@ if selected == "Visão Geral":
             fig.update_layout(
                 legend=dict(orientation='h', yanchor='bottom', y=-0.35, xanchor='center', x=0.5, font=dict(size=11))
             )
+            fig = aplicar_tema_escuro_plotly(fig)
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info('Não há despesas para exibir no gráfico com os filtros selecionados.')
@@ -296,6 +432,7 @@ if selected == "Visão Geral":
             fig_desc.update_layout(
                 legend=dict(orientation='h', yanchor='bottom', y=-0.35, xanchor='center', x=0.5, font=dict(size=11))
             )
+            fig_desc = aplicar_tema_escuro_plotly(fig_desc)
             st.plotly_chart(fig_desc, use_container_width=True)
         else:
             st.info('Não há despesas para exibir no gráfico de descrição com os filtros selecionados.')
@@ -330,6 +467,7 @@ if selected == "Visão Geral":
             fig_fav.update_layout(
                 legend=dict(orientation='h', yanchor='bottom', y=-0.35, xanchor='center', x=0.5, font=dict(size=11))
             )
+            fig_fav = aplicar_tema_escuro_plotly(fig_fav)
             st.plotly_chart(fig_fav, use_container_width=True)
         else:
             st.info('Não há despesas para exibir no gráfico de favorecido com os filtros selecionados.')
@@ -362,6 +500,7 @@ if selected == "Visão Geral":
             plot_bgcolor='rgba(0,0,0,0)',
             bargap=0.2
         )
+        fig_evol = aplicar_tema_escuro_plotly(fig_evol)
         st.plotly_chart(fig_evol, use_container_width=True)
     else:
         st.info('Não há despesas para exibir a evolução ao longo dos dias com os filtros selecionados.')
@@ -499,6 +638,7 @@ elif selected == "Para onde vai":
             margin=dict(t=40, b=120),
             height=500
         )
+        fig = aplicar_tema_escuro_plotly(fig)
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info('Não há despesas suficientes para exibir o gráfico de Pareto com os filtros selecionados.')
@@ -558,6 +698,7 @@ elif selected == "Pra quem vai":
             margin=dict(t=40, b=120),
             height=500
         )
+        fig = aplicar_tema_escuro_plotly(fig)
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info('Não há despesas suficientes para exibir o gráfico de Pareto com os filtros selecionados.')
@@ -744,6 +885,7 @@ elif selected == "Fluxo de Caixa":
             height=420,
             showlegend=False,
         )
+        fig_fluxo = aplicar_tema_escuro_plotly(fig_fluxo)
         st.markdown('<div style="background:#181c2f; border-radius:18px; padding:18px 10px 0 10px;">', unsafe_allow_html=True)
         st.plotly_chart(fig_fluxo, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
@@ -835,6 +977,7 @@ elif selected == "Despesas por Categoria":
                 ),
                 legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='center', x=0.5)
             )
+            fig = aplicar_tema_escuro_plotly(fig)
             st.plotly_chart(fig, use_container_width=True)
     else:
         st.info('Não há despesas para exibir por subcategoria com os filtros selecionados.')
@@ -842,35 +985,14 @@ elif selected == "Despesas por Categoria":
 # --- GRUPO DE ANÁLISE DE VENDAS ---
 if selected == "Vendas":
     st.markdown('## 📈 Análise de Vendas')
-    df_vendas = pd.read_excel(xls, sheet_name='Vendas')
-    df_vendas['DATA'] = pd.to_datetime(df_vendas['DATA'], errors='coerce')
-    df_vendas = df_vendas.dropna(subset=['DATA'])
-    df_vendas['Ano'] = df_vendas['DATA'].dt.year.astype(str)
-    df_vendas['Mês'] = df_vendas['DATA'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
-
-    # Filtros (ano, mês, conta, tipo de recebimento, pago)
-    with st.sidebar:
-        st.markdown('---')
-        st.header('Filtros de Vendas')
-        anos_vendas = df_vendas['Ano'].dropna().unique().tolist()
-        anos_vendas_sel = st.multiselect('Ano (Vendas)', sorted(anos_vendas, reverse=True), default=sorted(anos_vendas, reverse=True), key='ano_vendas')
-        meses_ordem = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-        meses_vendas = [m for m in meses_ordem if m in df_vendas['Mês'].unique()]
-        meses_vendas_sel = st.multiselect('Mês (Vendas)', meses_vendas, default=meses_vendas, key='mes_vendas')
-        contas_vendas = ['Todas'] + df_vendas['CONTA'].dropna().unique().tolist()
-        conta_vendas_sel = st.selectbox('Conta (Vendas)', contas_vendas, key='conta_vendas')
-        tipos_receb = ['Todos'] + df_vendas['TIPO DE RECEBIMENTO'].dropna().unique().tolist()
-        tipo_receb_sel = st.selectbox('Tipo de Recebimento', tipos_receb, key='tipo_receb_vendas')
-        pago_opcoes = ['Todos', 'Sim', 'Não']
-        pago_sel = st.selectbox('Pago?', pago_opcoes, key='pago_vendas')
-
-    # Aplica filtros
+    # df_vendas já foi lido na sidebar
+    # Recupera os filtros definidos na sidebar
     vendas_filtradas = df_vendas[
-        (df_vendas['Ano'].isin(anos_vendas_sel) if anos_vendas_sel else True) &
-        (df_vendas['Mês'].isin(meses_vendas_sel) if meses_vendas_sel else True) &
-        ((df_vendas['CONTA'] == conta_vendas_sel) | (conta_vendas_sel == 'Todas')) &
-        ((df_vendas['TIPO DE RECEBIMENTO'] == tipo_receb_sel) | (tipo_receb_sel == 'Todos')) &
-        ((df_vendas['PAGO'].astype(str).str.lower() == pago_sel.lower()) | (pago_sel == 'Todos'))
+        (df_vendas['Ano'].isin(st.session_state['ano_vendas']) if st.session_state['ano_vendas'] else True) &
+        (df_vendas['Mês'].isin(st.session_state['mes_vendas']) if st.session_state['mes_vendas'] else True) &
+        ((df_vendas['CONTA'] == st.session_state['conta_vendas']) | (st.session_state['conta_vendas'] == 'Todas')) &
+        ((df_vendas['TIPO DE RECEBIMENTO'] == st.session_state['tipo_receb_vendas']) | (st.session_state['tipo_receb_vendas'] == 'Todos')) &
+        ((df_vendas['PAGO'].astype(str).str.lower() == st.session_state['pago_vendas'].lower()) | (st.session_state['pago_vendas'] == 'Todos'))
     ]
 
     # Indicadores
@@ -881,28 +1003,90 @@ if selected == "Vendas":
     total_a_receber = vendas_filtradas[vendas_filtradas['PAGO'].astype(str).str.lower() == 'não']['VALOR'].sum()
 
     st.markdown('---')
+    # Indicadores de vendas com cartões escuros padronizados
+    st.markdown("""
+        <style>
+        .card-vendas {
+            min-height: 110px;
+            height: 110px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+            text-align: left;
+            padding: 20px 28px 20px 28px;
+            border-radius: 18px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.10);
+            margin-bottom: 8px;
+        }
+        .card-vendas h4 {
+            margin: 0 0 8px 0;
+            font-weight: 400;
+            font-size: 1.05rem;
+            letter-spacing: 0.5px;
+            color: #b0b0b0;
+        }
+        .card-vendas h2 {
+            margin: 0;
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: 1px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
     colv1, colv2, colv3, colv4, colv5 = st.columns(5)
     with colv1:
-        st.markdown(f"<div class='card-fixo' style='background: linear-gradient(90deg, #43cea2 0%, #185a9d 100%); border-radius:10px; color:white;'><h4>Total Vendido</h4><h2>{format_brl(total_vendido)}</h2></div>", unsafe_allow_html=True)
+        st.markdown(f"""<div class='card-vendas' style='background: linear-gradient(90deg, #232526 0%, #414345 100%);'>
+            <h4>Total Vendido</h4>
+            <h2>{format_brl(total_vendido)}</h2>
+        </div>""", unsafe_allow_html=True)
     with colv2:
-        st.markdown(f"<div class='card-fixo' style='background: linear-gradient(90deg, #11998e 0%, #38ef7d 100%); border-radius:10px; color:white;'><h4>Nº de Vendas</h4><h2>{num_vendas}</h2></div>", unsafe_allow_html=True)
+        st.markdown(f"""<div class='card-vendas' style='background: linear-gradient(90deg, #283E51 0%, #485563 100%);'>
+            <h4>Nº de Vendas</h4>
+            <h2>{num_vendas}</h2>
+        </div>""", unsafe_allow_html=True)
     with colv3:
-        st.markdown(f"<div class='card-fixo' style='background: linear-gradient(90deg, #fc6076 0%, #ff9a44 100%); border-radius:10px; color:white;'><h4>Ticket Médio</h4><h2>{format_brl(ticket_medio)}</h2></div>", unsafe_allow_html=True)
+        st.markdown(f"""<div class='card-vendas' style='background: linear-gradient(90deg, #373B44 0%, #4286f4 100%);'>
+            <h4>Ticket Médio</h4>
+            <h2>{format_brl(ticket_medio)}</h2>
+        </div>""", unsafe_allow_html=True)
     with colv4:
-        st.markdown(f"<div class='card-fixo' style='background: linear-gradient(90deg, #f7971e 0%, #ffd200 100%); border-radius:10px; color:white;'><h4>Total Recebido</h4><h2>{format_brl(total_recebido)}</h2></div>", unsafe_allow_html=True)
+        st.markdown(f"""<div class='card-vendas' style='background: linear-gradient(90deg, #232526 0%, #757F9A 100%);'>
+            <h4>Total Recebido</h4>
+            <h2>{format_brl(total_recebido)}</h2>
+        </div>""", unsafe_allow_html=True)
     with colv5:
-        st.markdown(f"<div class='card-fixo' style='background: linear-gradient(90deg, #b06ab3 0%, #4568dc 100%); border-radius:10px; color:white;'><h4>Total a Receber</h4><h2>{format_brl(total_a_receber)}</h2></div>", unsafe_allow_html=True)
+        st.markdown(f"""<div class='card-vendas' style='background: linear-gradient(90deg, #232526 0%, #6a3093 100%);'>
+            <h4>Total a Receber</h4>
+            <h2>{format_brl(total_a_receber)}</h2>
+        </div>""", unsafe_allow_html=True)
 
     # Gráficos de rosca lado a lado
     st.markdown('---')
     colg1, colg2 = st.columns(2)
     with colg1:
-        # Vendas por cliente (top 5)
+        # Vendas por cliente (top 5 em valor)
         if not vendas_filtradas.empty:
             top_clientes = vendas_filtradas.groupby('DESCRIÇÃO')['VALOR'].sum().sort_values(ascending=False).head(5)
-            fig_cli = px.pie(names=top_clientes.index, values=top_clientes.values, hole=0.5, title='Top 5 Clientes', color_discrete_sequence=px.colors.sequential.RdBu)
-            fig_cli.update_traces(textinfo='percent', textposition='outside', pull=[0.05]*5)
+            fig_cli = px.pie(names=top_clientes.index, values=top_clientes.values, hole=0.5, title='Top 5 Clientes (Valor)', color_discrete_sequence=px.colors.sequential.RdBu)
+            fig_cli.update_traces(textinfo='percent', textposition='outside', pull=[0.05]*5, textfont=dict(family='Arial', size=16, color='black'), textfont_weight='bold')
+            fig_cli.update_layout(
+                title_font_size=22,
+                legend=dict(orientation='h', yanchor='bottom', y=-0.25, xanchor='center', x=0.5, font=dict(size=13))
+            )
+            fig_cli = aplicar_tema_escuro_plotly(fig_cli)
             st.plotly_chart(fig_cli, use_container_width=True)
+            # Top 5 clientes em quantidade de vendas
+            top_clientes_qtd = vendas_filtradas['DESCRIÇÃO'].value_counts().head(5)
+            fig_cli_qtd = px.pie(names=top_clientes_qtd.index, values=top_clientes_qtd.values, hole=0.5, title='Top 5 Clientes (Qtd. Vendas)', color_discrete_sequence=px.colors.sequential.RdBu)
+            fig_cli_qtd.update_traces(textinfo='percent', textposition='outside', pull=[0.05]*5, textfont=dict(family='Arial', size=16, color='black'), textfont_weight='bold')
+            fig_cli_qtd.update_layout(
+                title_font_size=22,
+                legend=dict(orientation='h', yanchor='bottom', y=-0.25, xanchor='center', x=0.5, font=dict(size=13))
+            )
+            fig_cli_qtd = aplicar_tema_escuro_plotly(fig_cli_qtd)
+            st.plotly_chart(fig_cli_qtd, use_container_width=True)
         else:
             st.info('Não há vendas para exibir por cliente.')
     with colg2:
@@ -910,7 +1094,12 @@ if selected == "Vendas":
         if not vendas_filtradas.empty:
             tipo_receb = vendas_filtradas.groupby('TIPO DE RECEBIMENTO')['VALOR'].sum().sort_values(ascending=False)
             fig_tipo = px.pie(names=tipo_receb.index, values=tipo_receb.values, hole=0.5, title='Por Tipo de Recebimento', color_discrete_sequence=px.colors.sequential.RdBu)
-            fig_tipo.update_traces(textinfo='percent', textposition='outside')
+            fig_tipo.update_traces(textinfo='percent', textposition='outside', textfont=dict(family='Arial', size=16, color='black'), textfont_weight='bold')
+            fig_tipo.update_layout(
+                title_font_size=22,
+                legend=dict(orientation='h', yanchor='bottom', y=-0.25, xanchor='center', x=0.5, font=dict(size=13))
+            )
+            fig_tipo = aplicar_tema_escuro_plotly(fig_tipo)
             st.plotly_chart(fig_tipo, use_container_width=True)
         else:
             st.info('Não há vendas para exibir por tipo de recebimento.')
@@ -923,8 +1112,17 @@ if selected == "Vendas":
         evol['MÊS_NUM'] = evol['Mês'].apply(lambda x: meses_ordem.index(x) if x in meses_ordem else -1)
         evol = evol.sort_values(['Ano', 'MÊS_NUM'])
         evol['MêsAno'] = evol['Mês'] + '/' + evol['Ano']
-        fig_evol = px.bar(evol, x='MêsAno', y='VALOR', labels={'MêsAno':'Mês/Ano','VALOR':'Total Vendido'}, color_discrete_sequence=['#43cea2'])
-        fig_evol.update_layout(xaxis_tickangle=-35, height=320)
+        fig_evol = px.bar(
+            evol,
+            x='MêsAno',
+            y='VALOR',
+            labels={'MêsAno':'Mês/Ano','VALOR':'Total Vendido'},
+            color_discrete_sequence=['#43cea2'],
+            text=evol['VALOR'].apply(lambda x: f"R$ {x:,.2f}".replace(",", "."))
+        )
+        fig_evol.update_traces(textposition='auto', textfont_size=14)
+        fig_evol.update_layout(xaxis_tickangle=-35, height=320, margin=dict(t=60, b=40, l=0, r=0))
+        fig_evol = aplicar_tema_escuro_plotly(fig_evol)
         st.plotly_chart(fig_evol, use_container_width=True)
     else:
         st.info('Não há vendas para exibir evolução.')
@@ -941,4 +1139,14 @@ if selected == "Vendas":
     else:
         st.info('Não há vendas para exibir na tabela.')
 
-# ... rest of the file remains unchanged ... 
+    # Botão de redefinir filtros no rodapé da sidebar
+    st.markdown('---')
+    if st.button('Redefinir Filtros'):
+        st.session_state['reset_filtros'] = True
+        # Resetar filtros de vendas também
+        for key in ['ano_vendas', 'mes_vendas', 'conta_vendas', 'tipo_receb_vendas', 'pago_vendas']:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.experimental_rerun()
+    else:
+        st.session_state['reset_filtros'] = False 
