@@ -1,7 +1,6 @@
-streamlit==1.31.1
-pandas==2.2.0
-numpy==1.26.3
-plotly==5.18.0
-openpyxl==3.1.2
-numerize==0.12
-streamlit-option-menu==0.3.12 
+streamlit
+pandas
+plotly
+openpyxl
+numerize
+streamlit-option-menu 

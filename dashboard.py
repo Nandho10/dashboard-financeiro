@@ -33,8 +33,8 @@ st.markdown("""
 # --- SISTEMA DE NAVEGAÇÃO ---
 selected = option_menu(
     menu_title=None,
-    options=["Visão Geral", "Transações", "Para onde vai", "Pra quem vai", "Classificação ABC", "Fluxo de Caixa", "Despesas por Categoria"],
-    icons=["bar-chart", "table", "graph-up", "people-fill", "list-ol", "graph-up-arrow", "bar-chart-fill"],
+    options=["Visão Geral", "Transações", "Para onde vai", "Pra quem vai", "Classificação ABC", "Fluxo de Caixa", "Despesas por Categoria", "Vendas"],
+    icons=["bar-chart", "table", "graph-up", "people-fill", "list-ol", "graph-up-arrow", "bar-chart-fill", "cart-fill"],
     orientation="horizontal",
     default_index=0,
     styles={
@@ -838,5 +838,107 @@ elif selected == "Despesas por Categoria":
             st.plotly_chart(fig, use_container_width=True)
     else:
         st.info('Não há despesas para exibir por subcategoria com os filtros selecionados.')
+
+# --- GRUPO DE ANÁLISE DE VENDAS ---
+if selected == "Vendas":
+    st.markdown('## 📈 Análise de Vendas')
+    df_vendas = pd.read_excel(xls, sheet_name='Vendas')
+    df_vendas['DATA'] = pd.to_datetime(df_vendas['DATA'], errors='coerce')
+    df_vendas = df_vendas.dropna(subset=['DATA'])
+    df_vendas['Ano'] = df_vendas['DATA'].dt.year.astype(str)
+    df_vendas['Mês'] = df_vendas['DATA'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
+
+    # Filtros (ano, mês, conta, tipo de recebimento, pago)
+    with st.sidebar:
+        st.markdown('---')
+        st.header('Filtros de Vendas')
+        anos_vendas = df_vendas['Ano'].dropna().unique().tolist()
+        anos_vendas_sel = st.multiselect('Ano (Vendas)', sorted(anos_vendas, reverse=True), default=sorted(anos_vendas, reverse=True), key='ano_vendas')
+        meses_ordem = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+        meses_vendas = [m for m in meses_ordem if m in df_vendas['Mês'].unique()]
+        meses_vendas_sel = st.multiselect('Mês (Vendas)', meses_vendas, default=meses_vendas, key='mes_vendas')
+        contas_vendas = ['Todas'] + df_vendas['CONTA'].dropna().unique().tolist()
+        conta_vendas_sel = st.selectbox('Conta (Vendas)', contas_vendas, key='conta_vendas')
+        tipos_receb = ['Todos'] + df_vendas['TIPO DE RECEBIMENTO'].dropna().unique().tolist()
+        tipo_receb_sel = st.selectbox('Tipo de Recebimento', tipos_receb, key='tipo_receb_vendas')
+        pago_opcoes = ['Todos', 'Sim', 'Não']
+        pago_sel = st.selectbox('Pago?', pago_opcoes, key='pago_vendas')
+
+    # Aplica filtros
+    vendas_filtradas = df_vendas[
+        (df_vendas['Ano'].isin(anos_vendas_sel) if anos_vendas_sel else True) &
+        (df_vendas['Mês'].isin(meses_vendas_sel) if meses_vendas_sel else True) &
+        ((df_vendas['CONTA'] == conta_vendas_sel) | (conta_vendas_sel == 'Todas')) &
+        ((df_vendas['TIPO DE RECEBIMENTO'] == tipo_receb_sel) | (tipo_receb_sel == 'Todos')) &
+        ((df_vendas['PAGO'].astype(str).str.lower() == pago_sel.lower()) | (pago_sel == 'Todos'))
+    ]
+
+    # Indicadores
+    total_vendido = vendas_filtradas['VALOR'].sum()
+    num_vendas = len(vendas_filtradas)
+    ticket_medio = total_vendido / num_vendas if num_vendas > 0 else 0
+    total_recebido = vendas_filtradas[vendas_filtradas['PAGO'].astype(str).str.lower() == 'sim']['VALOR'].sum()
+    total_a_receber = vendas_filtradas[vendas_filtradas['PAGO'].astype(str).str.lower() == 'não']['VALOR'].sum()
+
+    st.markdown('---')
+    colv1, colv2, colv3, colv4, colv5 = st.columns(5)
+    with colv1:
+        st.markdown(f"<div class='card-fixo' style='background: linear-gradient(90deg, #43cea2 0%, #185a9d 100%); border-radius:10px; color:white;'><h4>Total Vendido</h4><h2>{format_brl(total_vendido)}</h2></div>", unsafe_allow_html=True)
+    with colv2:
+        st.markdown(f"<div class='card-fixo' style='background: linear-gradient(90deg, #11998e 0%, #38ef7d 100%); border-radius:10px; color:white;'><h4>Nº de Vendas</h4><h2>{num_vendas}</h2></div>", unsafe_allow_html=True)
+    with colv3:
+        st.markdown(f"<div class='card-fixo' style='background: linear-gradient(90deg, #fc6076 0%, #ff9a44 100%); border-radius:10px; color:white;'><h4>Ticket Médio</h4><h2>{format_brl(ticket_medio)}</h2></div>", unsafe_allow_html=True)
+    with colv4:
+        st.markdown(f"<div class='card-fixo' style='background: linear-gradient(90deg, #f7971e 0%, #ffd200 100%); border-radius:10px; color:white;'><h4>Total Recebido</h4><h2>{format_brl(total_recebido)}</h2></div>", unsafe_allow_html=True)
+    with colv5:
+        st.markdown(f"<div class='card-fixo' style='background: linear-gradient(90deg, #b06ab3 0%, #4568dc 100%); border-radius:10px; color:white;'><h4>Total a Receber</h4><h2>{format_brl(total_a_receber)}</h2></div>", unsafe_allow_html=True)
+
+    # Gráficos de rosca lado a lado
+    st.markdown('---')
+    colg1, colg2 = st.columns(2)
+    with colg1:
+        # Vendas por cliente (top 5)
+        if not vendas_filtradas.empty:
+            top_clientes = vendas_filtradas.groupby('DESCRIÇÃO')['VALOR'].sum().sort_values(ascending=False).head(5)
+            fig_cli = px.pie(names=top_clientes.index, values=top_clientes.values, hole=0.5, title='Top 5 Clientes', color_discrete_sequence=px.colors.sequential.RdBu)
+            fig_cli.update_traces(textinfo='percent', textposition='outside', pull=[0.05]*5)
+            st.plotly_chart(fig_cli, use_container_width=True)
+        else:
+            st.info('Não há vendas para exibir por cliente.')
+    with colg2:
+        # Vendas por tipo de recebimento
+        if not vendas_filtradas.empty:
+            tipo_receb = vendas_filtradas.groupby('TIPO DE RECEBIMENTO')['VALOR'].sum().sort_values(ascending=False)
+            fig_tipo = px.pie(names=tipo_receb.index, values=tipo_receb.values, hole=0.5, title='Por Tipo de Recebimento', color_discrete_sequence=px.colors.sequential.RdBu)
+            fig_tipo.update_traces(textinfo='percent', textposition='outside')
+            st.plotly_chart(fig_tipo, use_container_width=True)
+        else:
+            st.info('Não há vendas para exibir por tipo de recebimento.')
+
+    # Gráfico de evolução das vendas (abaixo dos roscas)
+    st.markdown('---')
+    st.markdown('#### Evolução Mensal das Vendas')
+    if not vendas_filtradas.empty:
+        evol = vendas_filtradas.groupby(['Ano', 'Mês'])['VALOR'].sum().reset_index()
+        evol['MÊS_NUM'] = evol['Mês'].apply(lambda x: meses_ordem.index(x) if x in meses_ordem else -1)
+        evol = evol.sort_values(['Ano', 'MÊS_NUM'])
+        evol['MêsAno'] = evol['Mês'] + '/' + evol['Ano']
+        fig_evol = px.bar(evol, x='MêsAno', y='VALOR', labels={'MêsAno':'Mês/Ano','VALOR':'Total Vendido'}, color_discrete_sequence=['#43cea2'])
+        fig_evol.update_layout(xaxis_tickangle=-35, height=320)
+        st.plotly_chart(fig_evol, use_container_width=True)
+    else:
+        st.info('Não há vendas para exibir evolução.')
+
+    # Tabela detalhada
+    st.markdown('---')
+    st.markdown('### Tabela Detalhada de Vendas')
+    if not vendas_filtradas.empty:
+        df_tab = vendas_filtradas.copy()
+        df_tab['DATA'] = df_tab['DATA'].dt.strftime('%d/%m/%Y')
+        df_tab = df_tab.rename(columns={'DATA':'Data','DESCRIÇÃO':'Cliente','CONTA':'Conta','TIPO DE RECEBIMENTO':'Tipo de Recebimento','VALOR':'Valor','PAGO':'Pago'})
+        df_tab['Valor'] = df_tab['Valor'].apply(format_brl)
+        st.dataframe(df_tab[['Data','Cliente','Conta','Tipo de Recebimento','Valor','Pago']], use_container_width=True, hide_index=True)
+    else:
+        st.info('Não há vendas para exibir na tabela.')
 
 # ... rest of the file remains unchanged ... 
