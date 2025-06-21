@@ -5,5 +5,5 @@ plotly
 pillow
 openpyxl
 numerize
-streamlit-option-menu
+streamlit-option-menu 
 reportlab 
