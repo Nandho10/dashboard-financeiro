@@ -1,0 +1,107 @@
+/* Fundo geral e containers principais */
+body, .stApp, .block-container, .main {
+    background-color: #181c2f !important;
+}
+.block-container, .main, .stApp {
+    box-shadow: none !important;
+    border: none !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+/* Menu ocupa 100% do container principal, centralizado */
+div[data-testid="horizontal-menu"] {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: #181c2f !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    z-index: 100;
+    display: flex !important;
+    justify-content: center !important;
+}
+/* Força fundo escuro no container do menu para eliminar área branca (seletor ultra-específico) */
+div[data-testid="horizontal-menu"] > div.container-xxl.d-flex.flex-column.flex-shrink-0.p-h.nav-justified {
+    background: #181c2f !important;
+    background-color: #181c2f !important;
+    box-shadow: none !important;
+    border-radius: 8px !important;
+}
+div[data-testid="horizontal-menu"] .container-xxl {
+    background: #181c2f !important;
+    background-color: #181c2f !important;
+    box-shadow: none !important;
+}
+/* Inputs e selects */
+.stSelectbox, .stMultiSelect, .stTextInput, .stNumberInput, .stDateInput, .stSlider, .stRadio, .stCheckbox {
+    background-color: #232526 !important;
+    color: #f5f6fa !important;
+    border-radius: 8px !important;
+    border: 1px solid #333 !important;
+}
+/* Itens internos dos selects */
+.stSelectbox div, .stMultiSelect div, .stTextInput input, .stMultiSelect input {
+    background-color: #232526 !important;
+    color: #f5f6fa !important;
+}
+/* Botão de remover item do multiselect */
+.stMultiSelect .css-1gtu0rj, .stMultiSelect .css-12jo7m5 {
+    background: #414345 !important;
+    color: #fff !important;
+}
+/* Expander */
+.stExpander, .stExpanderHeader, .stExpanderContent {
+    background-color: #232526 !important;
+    color: #f5f6fa !important;
+    border-radius: 8px !important;
+}
+/* Cartões customizados */
+.card-fixo {
+    min-height: 110px;
+    height: 110px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    text-align: left;
+    padding: 20px 28px 20px 28px;
+    border-radius: 18px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.10);
+    margin-bottom: 8px;
+}
+.card-fixo h4 {
+    margin: 0 0 8px 0;
+    font-weight: 400;
+    font-size: 1.05rem;
+    letter-spacing: 0.5px;
+    color: #b0b0b0;
+}
+.card-fixo h2 {
+    margin: 0;
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 1px;
+}
+/* Tabela de transações */
+.trans-table {width:100%; border-collapse:collapse;}
+.trans-table th, .trans-table td {border:1px solid #eee; padding:6px 8px; text-align:center; font-size:15px;}
+.trans-table th {background:#185a9d; color:#fff;}
+.recebido {color:green; font-weight:bold;}
+.pagamento {color:red; font-weight:bold;}
+.seta-verde {color:green; font-size:18px; font-weight:bold;}
+.seta-vermelha {color:red; font-size:18px; font-weight:bold;}
+/* Tabela ABC */
+.abc-table {width:100%; border-collapse:collapse;}
+.abc-table th, .abc-table td {border:1px solid #eee; padding:6px 8px; text-align:center; font-size:15px;}
+.abc-table th {background:#185a9d; color:#fff;}
+.cat-a {color: #fc6076; font-weight: bold;}
+.cat-b {color: #ffd200; font-weight: bold;}
+.seta-cinza {color:#888; font-size:18px; font-weight:bold;}
+.classe-b-icone {color:#ffd200; font-size:18px; font-weight:bold;} 

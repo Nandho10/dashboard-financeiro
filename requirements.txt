@@ -1,6 +1,10 @@
 streamlit
 pandas
+numpy
 plotly
 openpyxl
 numerize
-streamlit-option-menu 
+streamlit-option-menu
+reportlab
+pillow
+kaleido 
