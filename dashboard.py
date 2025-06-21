@@ -2,13 +2,52 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-from numerize.numerize import numerize
-from streamlit_option_menu import option_menu
+import plotly.graph_objects as go
+from PIL import Image
+from datetime import datetime, timedelta
+import pytz
+import os
 import streamlit.components.v1 as components
+from numerize import numerize
+from streamlit_option_menu import option_menu
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.utils import ImageReader
+import openpyxl
+
+# --- CONFIGURAÇÃO DA PÁGINA ---
+st.set_page_config(
+    page_title="Dashboard Financeiro",
+    page_icon="💲",
+    layout="wide",
+)
+
+# --- FUNÇÃO PARA VERIFICAR E ADICIONAR COLUNA ---
+def check_and_add_favorecido_column(excel_path):
+    """Verifica se a coluna 'FAVORECIDO' existe na aba 'Receitas' e a adiciona se não existir."""
+    try:
+        workbook = openpyxl.load_workbook(excel_path)
+        if 'Receitas' in workbook.sheetnames:
+            sheet = workbook['Receitas']
+            headers = [cell.value for cell in sheet[1]]
+            if 'FAVORECIDO' not in headers:
+                new_col_idx = sheet.max_column + 1
+                sheet.cell(row=1, column=new_col_idx, value='FAVORECIDO')
+                for row in range(2, sheet.max_row + 1):
+                    sheet.cell(row=row, column=new_col_idx, value='N/A')
+                workbook.save(excel_path)
+                st.toast("Coluna 'FAVORECIDO' adicionada com sucesso à aba 'Receitas'!")
+        workbook.close()
+    except Exception as e:
+        st.warning(f"Atenção: Não foi possível adicionar a coluna 'FAVORECIDO' automaticamente: {e}")
+
+# --- CAMINHO DO ARQUIVO E CARREGAMENTO INICIAL ---
+excel_path = 'Base_financas.xlsx'
+check_and_add_favorecido_column(excel_path) # Executa a verificação no início
+xls = pd.ExcelFile(excel_path)
 
 # Outras importações úteis
 import plotly.graph_objects as go
-import os
 from datetime import datetime, timedelta
 
 # Importação do módulo de relatórios
@@ -151,11 +190,7 @@ selected = option_menu(
     default_index=0,
 )
 
-# Caminho do arquivo Excel
-excel_path = 'Base_financas.xlsx'
-
 # Lê todas as abas do arquivo Excel
-xls = pd.ExcelFile(excel_path)
 abas = xls.sheet_names
 
 # Exemplo de leitura de uma aba específica:
@@ -696,6 +731,11 @@ elif selected == "Transações":
     df_trans['Saldo'] = df_trans['Recebidos'] - df_trans['Pagamentos']
     df_trans['Saldo Acumulado Num'] = df_trans['Saldo'].cumsum()
     df_trans['DATA'] = df_trans['DATA'].dt.strftime('%d/%m/%Y')
+    
+    # Preenche valores nulos na coluna Favorecido
+    if 'FAVORECIDO' in df_trans.columns:
+        df_trans['FAVORECIDO'] = df_trans['FAVORECIDO'].fillna('N/A')
+    
     df_trans = df_trans.rename(columns={
         'DATA': 'Data',
         'FAVORECIDO': 'Favorecido',
@@ -2086,6 +2126,8 @@ if st.session_state.get("show_receita_form", False):
                 descricao_receita = opcao_descricao_rec
                 st.success(f"✅ Item selecionado: {descricao_receita}")
             
+            favorecido_receita = st.text_input("Favorecido / Pagador", key="fav_receita")
+            
             col_submit, col_cancel = st.columns(2)
             submitted = col_submit.form_submit_button("✔️ Salvar Receita", use_container_width=True, type="primary")
             if col_cancel.form_submit_button("✖️ Cancelar", use_container_width=True):
@@ -2097,8 +2139,12 @@ if st.session_state.get("show_receita_form", False):
                     st.warning("Descrição e Valor são obrigatórios.")
                 else:
                     new_data = pd.DataFrame([{
-                        'DATA': pd.to_datetime(data_receita), 'CATEGORIA': categoria_receita,
-                        'DESCRIÇÃO': descricao_receita, 'CONTA': conta_receita, 'VALOR': valor_receita
+                        'DATA': pd.to_datetime(data_receita), 
+                        'CATEGORIA': categoria_receita,
+                        'DESCRIÇÃO': descricao_receita, 
+                        'CONTA': conta_receita, 
+                        'VALOR': valor_receita,
+                        'FAVORECIDO': favorecido_receita if favorecido_receita else 'N/A'
                     }])
                     if save_transaction(new_data, "Receitas"):
                         st.success("Receita salva com sucesso!")
