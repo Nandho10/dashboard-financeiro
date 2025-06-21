@@ -196,82 +196,99 @@ abas = xls.sheet_names
 # Exemplo de leitura de uma aba específica:
 # df_despesas = pd.read_excel(xls, sheet_name='Despesas')
 
-# Sidebar para filtros
+# --- BARRA LATERAL (SIDEBAR) ---
 with st.sidebar:
-    with st.expander('Filtros Gerais', expanded=False):
-        st.header('Filtros')
-        st.write('Selecione os filtros desejados abaixo:')
-        if 'reset_filtros' not in st.session_state:
-            st.session_state['reset_filtros'] = False
-        # Lê a aba 'Conta' para obter as opções de contas
-        df_conta = pd.read_excel(xls, sheet_name='Conta')
-        contas = df_conta['Contas'].dropna().unique().tolist()
+    st.image("https://raw.githubusercontent.com/Nandho1/Nandho1/main/Nandho1.gif", width=250)
+    
+    # Obter data atual para filtros padrão
+    hoje = datetime.now(pytz.timezone('America/Sao_Paulo'))
+    ano_atual = str(hoje.year)
+    mes_ingles = hoje.strftime('%b').capitalize()
+    # Mapeamento para traduzir os meses
+    mapa_meses = {'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'}
+    mes_atual = mapa_meses.get(mes_ingles, mes_ingles)
 
-        # Filtro de tipo de análise com checkboxes para evitar texto cortado
-        st.write('**Tipo de análise**')
-        col_rec, col_desp = st.columns(2)
-        show_receitas = col_rec.checkbox('Receitas', value=True)
-        show_despesas = col_desp.checkbox('Despesas', value=True)
+    # Filtros
+    st.header("Filtros")
+    
+    # Carregar anos de todas as fontes de dados, garantindo a conversão para datetime
+    df_r = pd.read_excel(xls, sheet_name='Receitas')
+    df_d = pd.read_excel(xls, sheet_name='Despesas')
+    df_i = pd.read_excel(xls, sheet_name='Investimentos')
+    df_c = pd.read_excel(xls, sheet_name='Div_CC')
 
-        tipos_selecionados = []
-        if show_receitas:
-            tipos_selecionados.append('Receitas')
-        if show_despesas:
-            tipos_selecionados.append('Despesas')
+    anos_r = pd.to_datetime(df_r['DATA'], errors='coerce').dt.year
+    anos_d = pd.to_datetime(df_d['DATA'], errors='coerce').dt.year
+    anos_i = pd.to_datetime(df_i['DATA'], errors='coerce').dt.year
+    anos_c = pd.to_datetime(df_c['Data'], errors='coerce').dt.year # Cuidado com 'Data' vs 'DATA'
 
-        # Filtro de conta com opção 'Todas'
-        contas_opcoes = ['Todas'] + contas
-        if st.session_state['reset_filtros']:
-            conta_selecionada = st.selectbox('Conta', contas_opcoes, index=0, key='conta_filtro_reset')
-        else:
-            conta_selecionada = st.selectbox('Conta', contas_opcoes, key='conta_filtro')
+    anos_disponiveis = sorted(pd.concat([anos_r, anos_d, anos_i, anos_c]).dropna().unique().astype(int).astype(str))
+    
+    # Definir ano_atual como padrão se estiver na lista, senão o último disponível
+    default_ano = [ano_atual] if ano_atual in anos_disponiveis else [anos_disponiveis[-1]] if anos_disponiveis else []
+    anos_selecionados = st.multiselect('Ano', anos_disponiveis, default=default_ano)
 
-        # Filtro dinâmico de categoria
-        if 'Receitas' in tipos_selecionados:
-            df_cat = pd.read_excel(xls, sheet_name='Receitas Categoria')
-            categorias = df_cat['SUBCATEGORIA'].dropna().unique().tolist()
-        else:
-            df_cat = pd.read_excel(xls, sheet_name='Despesas Categoria')
-            categorias = df_cat.columns.tolist()
+    meses_ordem = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    
+    # Definir mes_atual como padrão se houver anos selecionados
+    default_mes = [mes_atual] if anos_selecionados else []
+    meses_selecionados = st.multiselect('Mês', meses_ordem, default=default_mes)
+    
+    # Contas
+    df_conta = pd.read_excel(xls, sheet_name='Conta')
+    contas = df_conta['Contas'].dropna().unique().tolist()
 
-        # Filtro de categoria com opção 'Todas'
-        categorias_opcoes = ['Todas'] + categorias
-        if st.session_state['reset_filtros']:
-            categoria_selecionada = st.selectbox('Categoria', categorias_opcoes, index=0, key='cat_filtro_reset')
-        else:
-            categoria_selecionada = st.selectbox('Categoria', categorias_opcoes, key='cat_filtro')
+    # Filtro de tipo de análise com checkboxes para evitar texto cortado
+    st.write('**Tipo de análise**')
+    col_rec, col_desp = st.columns(2)
+    show_receitas = col_rec.checkbox('Receitas', value=True)
+    show_despesas = col_desp.checkbox('Despesas', value=True)
 
-        # Filtros de tempo extraindo Ano e Mês da coluna 'DATA'
-        if 'Receitas' in tipos_selecionados:
-            df_dados = pd.read_excel(xls, sheet_name='Receitas')
-        else:
-            df_dados = pd.read_excel(xls, sheet_name='Despesas')
+    tipos_selecionados = []
+    if show_receitas:
+        tipos_selecionados.append('Receitas')
+    if show_despesas:
+        tipos_selecionados.append('Despesas')
 
-        # Garante que a coluna DATA está em formato datetime
-        df_dados['DATA'] = pd.to_datetime(df_dados['DATA'], errors='coerce')
-        df_dados = df_dados.dropna(subset=['DATA'])
-        df_dados['Ano'] = df_dados['DATA'].dt.year.astype(str)
+    # Filtro de conta com opção 'Todas'
+    contas_opcoes = ['Todas'] + contas
+    if 'reset_filtros' not in st.session_state:
+        st.session_state['reset_filtros'] = False
+        
+    if st.session_state['reset_filtros']:
+        conta_selecionada = st.selectbox('Conta', contas_opcoes, index=0, key='conta_filtro_reset')
+    else:
+        conta_selecionada = st.selectbox('Conta', contas_opcoes, key='conta_filtro')
 
-        # Lista de meses em ordem cronológica (abreviações em português)
-        meses_ordem = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    # Filtro dinâmico de categoria
+    if 'Receitas' in tipos_selecionados:
+        df_cat = pd.read_excel(xls, sheet_name='Receitas Categoria')
+        categorias = df_cat['SUBCATEGORIA'].dropna().unique().tolist()
+    else:
+        df_cat = pd.read_excel(xls, sheet_name='Despesas Categoria')
+        categorias = df_cat.columns.tolist()
 
-        # Ajusta o nome dos meses para português, se necessário
-        df_dados['Mês'] = df_dados['DATA'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
+    # Filtro de categoria com opção 'Todas'
+    categorias_opcoes = ['Todas'] + categorias
+    if st.session_state['reset_filtros']:
+        categoria_selecionada = st.selectbox('Categoria', categorias_opcoes, index=0, key='cat_filtro_reset')
+    else:
+        categoria_selecionada = st.selectbox('Categoria', categorias_opcoes, key='cat_filtro')
 
-        # Filtro de ano com multiselect
-        anos = df_dados['Ano'].dropna().unique().tolist()
-        if st.session_state['reset_filtros']:
-            anos_selecionados = st.multiselect('Ano', sorted(anos, reverse=True), default=sorted(anos, reverse=True), key='ano_filtro_reset')
-        else:
-            anos_selecionados = st.multiselect('Ano', sorted(anos, reverse=True), default=sorted(anos, reverse=True), key='ano_filtro')
+    st.markdown('---')
+    if st.button('Redefinir Filtros'):
+        st.session_state['reset_filtros'] = True
+    
+    st.markdown('---')
+    with st.expander("🚀 Lançamentos Rápidos", expanded=True):
+        if st.button("➕ Nova Despesa", use_container_width=True, type="primary"):
+            st.session_state.show_despesa_form = True
+        if st.button("💰 Nova Receita", use_container_width=True):
+            st.session_state.show_receita_form = True
+        if st.button("💳 Nova Compra (CC)", use_container_width=True):
+            st.session_state.show_cc_form = True
 
-        # Filtro de mês com multiselect
-        meses = [m for m in meses_ordem if m in df_dados['Mês'].unique()]
-        if st.session_state['reset_filtros']:
-            meses_selecionados = st.multiselect('Mês', meses, default=meses, key='mes_filtro_reset')
-        else:
-            meses_selecionados = st.multiselect('Mês', meses, default=meses, key='mes_filtro')
-
+    # Filtros específicos por aba (movidos para dentro do sidebar)
     # Só mostra o expander de vendas se a aba Vendas estiver selecionada
     if selected == 'Vendas':
         df_vendas = pd.read_excel(xls, sheet_name='Vendas')
@@ -338,19 +355,6 @@ with st.sidebar:
 
             parcelas_opcoes = ['Todas'] + [str(x) for x in sorted(df_cc['Quantidade de parcelas'].dropna().unique())]
             parcelas_sel = st.selectbox('Quantidade de Parcelas', parcelas_opcoes, key='parcelas_cc_sidebar')
-
-    st.markdown('---')
-    if st.button('Redefinir Filtros'):
-        st.session_state['reset_filtros'] = True
-    
-    st.markdown('---')
-    with st.expander("🚀 Lançamentos Rápidos", expanded=True):
-        if st.button("➕ Nova Despesa", use_container_width=True, type="primary"):
-            st.session_state.show_despesa_form = True
-        if st.button("💰 Nova Receita", use_container_width=True):
-            st.session_state.show_receita_form = True
-        if st.button("💳 Nova Compra (CC)", use_container_width=True):
-            st.session_state.show_cc_form = True
 
 # --- CÁLCULO DOS INDICADORES BÁSICOS ---
 
