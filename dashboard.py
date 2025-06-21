@@ -14,6 +14,30 @@ from datetime import datetime, timedelta
 # Importação do módulo de relatórios
 from relatorio_pdf import RelatorioPDF, create_download_button
 
+# Função para carregar itens de validação das categorias
+def carregar_itens_categoria():
+    """Carrega os itens de cada categoria da planilha para validação"""
+    try:
+        xls = pd.ExcelFile(excel_path)
+        
+        # Carregar itens de despesas
+        df_cat_desp = pd.read_excel(xls, sheet_name='Despesas Categoria')
+        itens_despesas = {}
+        for coluna in df_cat_desp.columns:
+            itens = df_cat_desp[coluna].dropna().tolist()
+            itens_despesas[coluna] = itens
+        
+        # Carregar itens de receitas
+        df_cat_rec = pd.read_excel(xls, sheet_name='Receitas Categoria')
+        itens_receitas = []
+        if 'SUBCATEGORIA' in df_cat_rec.columns:
+            itens_receitas = df_cat_rec['SUBCATEGORIA'].dropna().unique().tolist()
+        
+        return itens_despesas, itens_receitas
+    except Exception as e:
+        st.error(f"Erro ao carregar itens de categoria: {e}")
+        return {}, []
+
 # Inicialização do session_state para os formulários
 if "show_despesa_form" not in st.session_state:
     st.session_state.show_despesa_form = False
@@ -342,7 +366,11 @@ else:
     valor_despesas = despesas_filtradas['VALOR'].sum()
 
 saldo = valor_recebidos + valor_despesas  # Despesas já são negativas
-percentual = (abs(valor_despesas) / valor_recebidos * 100) if valor_recebidos > 0 else 0
+# Corrige o cálculo do percentual para evitar divisão por zero
+if valor_recebidos > 0:
+    percentual = (abs(valor_despesas) / valor_recebidos * 100)
+else:
+    percentual = 0.0
 
 # --- CÁLCULO DE PERÍODO ANTERIOR E DELTAS ---
 saldo_anterior = 0
@@ -384,14 +412,39 @@ if len(meses_selecionados) == 1 and len(anos_selecionados) == 1:
     # Calcular deltas
     if receitas_anterior > 0:
         delta_receitas = ((valor_recebidos - receitas_anterior) / receitas_anterior) * 100
-    if despesas_anterior != 0:
+    else:
+        delta_receitas = 0.0
+        
+    if abs(despesas_anterior) > 0:
         delta_despesas = ((abs(valor_despesas) - abs(despesas_anterior)) / abs(despesas_anterior)) * 100
+    else:
+        delta_despesas = 0.0
 
 def format_brl(valor):
+    # Verifica se o valor é NaN ou None
+    if pd.isna(valor) or valor is None:
+        return "R$ 0,00"
+    
+    # Converte para float se necessário
+    try:
+        valor = float(valor)
+    except (ValueError, TypeError):
+        return "R$ 0,00"
+    
     return f"R$ {valor:,.2f}".replace(",", "v").replace(".", ",").replace("v", ".")
 
 # Helper para HTML do delta
 def get_delta_html(delta, reverse_colors=False):
+    # Verifica se o delta é NaN ou None
+    if pd.isna(delta) or delta is None:
+        return ""
+    
+    # Converte para float se necessário
+    try:
+        delta = float(delta)
+    except (ValueError, TypeError):
+        return ""
+    
     if delta > 0:
         arrow = "↑"
         color_class = "delta-p-green" if not reverse_colors else "delta-p-red"
@@ -1298,7 +1351,7 @@ if selected == "Investimentos":
     with col_prog2:
         if falta_para_meta > 0:
             st.metric("Falta", format_brl(falta_para_meta), delta="Para meta")
-        else:
+    else:
             st.metric("Meta Atingida! 🎉", format_brl(0), delta="Parabéns!")
     
     # Gráficos de análise
@@ -1923,7 +1976,8 @@ def save_transaction(df_new, sheet_name):
 
 # Modal para Nova Despesa
 if st.session_state.get("show_despesa_form", False):
-    with st.dialog("Lançar Nova Despesa"):
+    st.subheader("📝 Lançar Nova Despesa")
+    with st.container():
         with st.form("despesa_form", clear_on_submit=True):
             st.subheader("Preencha os dados da despesa:")
             # Ler dados para os selects
@@ -1935,11 +1989,39 @@ if st.session_state.get("show_despesa_form", False):
             c1, c2 = st.columns(2)
             data_despesa = c1.date_input("Data", datetime.now(), key="data_despesa")
             valor_despesa = c2.number_input("Valor (negativo)", value=0.0, format="%.2f", key="valor_despesa")
-            descricao_despesa = st.text_input("Descrição", key="desc_despesa")
             
             c3, c4 = st.columns(2)
             categoria_despesa = c3.selectbox("Categoria", sorted(categorias_desp), key="cat_despesa")
             conta_despesa = c4.selectbox("Conta de Origem", sorted(contas), key="conta_despesa")
+            
+            # Carregar itens da categoria selecionada para validação
+            itens_despesas, _ = carregar_itens_categoria()
+            itens_categoria = itens_despesas.get(categoria_despesa, [])
+            
+            # Campo de descrição com validação
+            st.write("**Descrição**")
+            col_desc1, col_desc2 = st.columns([3, 1])
+            
+            with col_desc1:
+                # Permitir seleção de item existente ou digitação livre
+                opcao_descricao = st.selectbox(
+                    "Selecione um item da categoria ou digite livremente:",
+                    ["Digite livremente"] + sorted(itens_categoria),
+                    key="opcao_desc_despesa"
+                )
+                
+                if opcao_descricao == "Digite livremente":
+                    descricao_despesa = st.text_input("Digite a descrição:", key="desc_despesa_livre")
+                else:
+                    descricao_despesa = opcao_descricao
+                    st.success(f"✅ Item selecionado: {descricao_despesa}")
+            
+            with col_desc2:
+                if itens_categoria:
+                    st.write("**Itens disponíveis:**")
+                    for item in sorted(itens_categoria):
+                        st.write(f"• {item}")
+            
             favorecido_despesa = st.text_input("Favorecido (opcional)", key="fav_despesa")
 
             col_submit, col_cancel = st.columns(2)
@@ -1966,7 +2048,8 @@ if st.session_state.get("show_despesa_form", False):
 
 # Modal para Nova Receita
 if st.session_state.get("show_receita_form", False):
-    with st.dialog("Lançar Nova Receita"):
+    st.subheader("💰 Lançar Nova Receita")
+    with st.container():
         with st.form("receita_form", clear_on_submit=True):
             st.subheader("Preencha os dados da receita:")
             df_conta = pd.read_excel(xls, sheet_name='Conta')
@@ -1977,11 +2060,36 @@ if st.session_state.get("show_receita_form", False):
             c1, c2 = st.columns(2)
             data_receita = c1.date_input("Data", datetime.now(), key="data_receita")
             valor_receita = c2.number_input("Valor (positivo)", value=0.00, format="%.2f", min_value=0.0, key="valor_receita")
-            descricao_receita = st.text_input("Descrição", key="desc_receita")
             
             c3, c4 = st.columns(2)
             categoria_receita = c3.selectbox("Categoria", sorted(categorias_rec), key="cat_receita")
             conta_receita = c4.selectbox("Conta de Destino", sorted(contas), key="conta_receita")
+            
+            # Campo de descrição com validação para receitas
+            _, itens_receitas = carregar_itens_categoria()
+            
+            st.write("**Descrição**")
+            col_desc1, col_desc2 = st.columns([3, 1])
+            
+            with col_desc1:
+                # Permitir seleção de item existente ou digitação livre
+                opcao_descricao_rec = st.selectbox(
+                    "Selecione um item da categoria ou digite livremente:",
+                    ["Digite livremente"] + sorted(itens_receitas),
+                    key="opcao_desc_receita"
+                )
+                
+                if opcao_descricao_rec == "Digite livremente":
+                    descricao_receita = st.text_input("Digite a descrição:", key="desc_receita_livre")
+                else:
+                    descricao_receita = opcao_descricao_rec
+                    st.success(f"✅ Item selecionado: {descricao_receita}")
+            
+            with col_desc2:
+                if itens_receitas:
+                    st.write("**Itens disponíveis:**")
+                    for item in sorted(itens_receitas):
+                        st.write(f"• {item}")
             
             col_submit, col_cancel = st.columns(2)
             submitted = col_submit.form_submit_button("✔️ Salvar Receita", use_container_width=True, type="primary")
@@ -2004,7 +2112,8 @@ if st.session_state.get("show_receita_form", False):
 
 # Modal para Nova Compra no Cartão
 if st.session_state.get("show_cc_form", False):
-    with st.dialog("Lançar Nova Compra no Cartão"):
+    st.subheader("💳 Lançar Nova Compra no Cartão")
+    with st.container():
         with st.form("cc_form", clear_on_submit=True):
             st.subheader("Preencha os dados da compra:")
             df_cc_base = pd.read_excel(xls, sheet_name='Div_CC')

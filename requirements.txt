@@ -6,5 +6,4 @@ openpyxl
 numerize
 streamlit-option-menu
 reportlab
-pillow
-kaleido 
+pillow 
