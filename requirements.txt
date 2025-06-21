@@ -7,3 +7,4 @@ openpyxl
 numerize
 streamlit-option-menu 
 reportlab 
+kaleido 

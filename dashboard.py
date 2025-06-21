@@ -15,6 +15,10 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.utils import ImageReader
 import openpyxl
 
+# --- IMPORTAÇÕES DOS NOVOS SISTEMAS ---
+from backup_system import BackupSystem, safe_backup
+from crud_system import CRUDSystem, format_dataframe_for_display, create_editable_table
+
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
     page_title="Dashboard Financeiro",
@@ -88,6 +92,24 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
         st.session_state.show_cc_form = False
     if "show_venda_form" not in st.session_state:
         st.session_state.show_venda_form = False
+
+    # --- INICIALIZAÇÃO DOS SISTEMAS CRUD E BACKUP ---
+    crud_system = CRUDSystem(excel_path)
+    backup_system = BackupSystem(excel_path)
+    
+    # Inicialização do session_state para CRUD
+    sheets_with_crud = ['Despesas', 'Receitas', 'Vendas', 'Investimentos', 'Div_CC']
+    for sheet in sheets_with_crud:
+        if f"show_edit_{sheet}" not in st.session_state:
+            st.session_state[f"show_edit_{sheet}"] = False
+        if f"show_delete_{sheet}" not in st.session_state:
+            st.session_state[f"show_delete_{sheet}"] = False
+        if f"show_bulk_delete_{sheet}" not in st.session_state:
+            st.session_state[f"show_bulk_delete_{sheet}"] = False
+        if f"selected_row_{sheet}" not in st.session_state:
+            st.session_state[f"selected_row_{sheet}"] = None
+        if f"selected_rows_{sheet}" not in st.session_state:
+            st.session_state[f"selected_rows_{sheet}"] = []
 
     st.set_page_config(page_title="DashBoard", layout="wide")
 
@@ -287,38 +309,7 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
         if st.button('Redefinir Filtros'):
             st.session_state['reset_filtros'] = True
         
-        st.markdown('---')
-        with st.expander("🚀 Lançamentos Rápidos", expanded=True):
-            if st.button("➕ Nova Despesa", use_container_width=True, type="primary"):
-                st.session_state.show_despesa_form = True
-            if st.button("💰 Nova Receita", use_container_width=True):
-                st.session_state.show_receita_form = True
-            if st.button("🛒 Nova Venda", use_container_width=True):
-                st.session_state.show_venda_form = True
-            if st.button("💳 Nova Compra (CC)", use_container_width=True):
-                st.session_state.show_cc_form = True
-
         # Filtros específicos por aba (movidos para dentro do sidebar)
-        # Só mostra o expander de vendas se a aba Vendas estiver selecionada
-        if selected == 'Vendas':
-            df_vendas = pd.read_excel(xls, sheet_name='Vendas')
-            df_vendas['DATA'] = pd.to_datetime(df_vendas['DATA'], errors='coerce')
-            df_vendas = df_vendas.dropna(subset=['DATA'])
-            df_vendas['Ano'] = df_vendas['DATA'].dt.year.astype(str)
-            df_vendas['Mês'] = df_vendas['DATA'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
-            with st.expander('Filtros de Vendas', expanded=True):
-                anos_vendas = df_vendas['Ano'].dropna().unique().tolist()
-                anos_vendas_sel = st.multiselect('Ano (Vendas)', sorted(anos_vendas, reverse=True), default=sorted(anos_vendas, reverse=True), key='ano_vendas')
-                meses_ordem = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-                meses_vendas = [m for m in meses_ordem if m in df_vendas['Mês'].unique()]
-                meses_vendas_sel = st.multiselect('Mês (Vendas)', meses_vendas, default=meses_vendas, key='mes_vendas')
-                contas_vendas = ['Todas'] + df_vendas['CONTA'].dropna().unique().tolist()
-                conta_vendas_sel = st.selectbox('Conta (Vendas)', contas_vendas, key='conta_vendas')
-                tipos_receb = ['Todos'] + df_vendas['TIPO DE RECEBIMENTO'].dropna().unique().tolist()
-                tipo_receb_sel = st.selectbox('Tipo de Recebimento', tipos_receb, key='tipo_receb_vendas')
-                pago_opcoes = ['Todos', 'Sim', 'Não']
-                pago_sel = st.selectbox('Pago?', pago_opcoes, key='pago_vendas')
-        
         # Só mostra o expander de investimentos se a aba Investimentos estiver selecionada
         if selected == 'Investimentos':
             df_investimentos = pd.read_excel(xls, sheet_name='Investimentos')
@@ -365,6 +356,46 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
 
                 parcelas_opcoes = ['Todas'] + [str(x) for x in sorted(df_cc['Quantidade de parcelas'].dropna().unique())]
                 parcelas_sel = st.selectbox('Quantidade de Parcelas', parcelas_opcoes, key='parcelas_cc_sidebar')
+
+        # --- SEÇÃO DE GERENCIAMENTO DE BACKUP ---
+        st.markdown('---')
+        with st.expander("💾 Gerenciamento de Backup", expanded=False):
+            col_backup1, col_backup2 = st.columns(2)
+            
+            with col_backup1:
+                if st.button("🔄 Criar Backup", use_container_width=True):
+                    success, message = safe_backup("manual")
+                    if success:
+                        st.success("Backup criado com sucesso!")
+                    else:
+                        st.error(f"Erro ao criar backup: {message}")
+            
+            with col_backup2:
+                if st.button("📋 Listar Backups", use_container_width=True):
+                    backups = backup_system.list_backups()
+                    if backups:
+                        st.write("**Backups disponíveis:**")
+                        for backup in backups[:5]:  # Mostra apenas os 5 mais recentes
+                            st.write(f"📁 {backup['filename']} ({backup['date'].strftime('%d/%m/%Y %H:%M')})")
+                    else:
+                        st.info("Nenhum backup encontrado.")
+            
+            # Opção para restaurar backup
+            backups = backup_system.list_backups()
+            if backups:
+                backup_options = [f"{b['filename']} ({b['date'].strftime('%d/%m/%Y %H:%M')})" for b in backups[:5]]
+                selected_backup = st.selectbox("Selecionar backup para restaurar:", backup_options, key="backup_restore")
+                
+                if st.button("🔄 Restaurar Backup", use_container_width=True):
+                    if selected_backup:
+                        backup_filename = selected_backup.split(" (")[0]
+                        backup_path = os.path.join('backups', backup_filename)
+                        success, message = backup_system.restore_backup(backup_path)
+                        if success:
+                            st.success("Backup restaurado com sucesso! Recarregue a página.")
+                            st.rerun()
+                        else:
+                            st.error(f"Erro ao restaurar backup: {message}")
 
     # --- CÁLCULO DOS INDICADORES BÁSICOS ---
 
@@ -734,111 +765,271 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
             st.info('Não há despesas para exibir a evolução ao longo dos dias com os filtros selecionados.')
 
     elif selected == "Transações":
-        # --- TABELA DE TRANSAÇÕES ---
-        df_trans = pd.concat([
-            receitas_filtradas.assign(TIPO='Recebido'),
-            despesas_filtradas.assign(TIPO='Pagamento')
-        ], ignore_index=True)
-        df_trans = df_trans.sort_values('DATA')
-        df_trans['Recebidos'] = df_trans.apply(lambda x: x['VALOR'] if x['TIPO']=='Recebido' else 0, axis=1)
-        df_trans['Pagamentos'] = df_trans.apply(lambda x: abs(x['VALOR']) if x['TIPO']=='Pagamento' else 0, axis=1)
-        df_trans['Saldo'] = df_trans['Recebidos'] - df_trans['Pagamentos']
-        df_trans['Saldo Acumulado Num'] = df_trans['Saldo'].cumsum()
-        df_trans['DATA'] = df_trans['DATA'].dt.strftime('%d/%m/%Y')
-        
-        # Preenche valores nulos na coluna Favorecido
-        if 'FAVORECIDO' in df_trans.columns:
-            df_trans['FAVORECIDO'] = df_trans['FAVORECIDO'].fillna('N/A')
-        
-        df_trans = df_trans.rename(columns={
-            'DATA': 'Data',
-            'FAVORECIDO': 'Favorecido',
-            'DESCRIÇÃO': 'Descrição',
-            'CATEGORIA': 'Categoria'
-        })
-        df_trans = df_trans[['Data', 'Favorecido', 'Descrição', 'Categoria', 'Recebidos', 'Pagamentos', 'Saldo Acumulado Num']]
-        # Formatar valores
-        df_trans['Recebidos'] = df_trans['Recebidos'].apply(format_brl)
-        df_trans['Pagamentos'] = df_trans['Pagamentos'].apply(format_brl)
-
-        # Adiciona setas Unicode coloridas via CSS
-        saldo_acum = df_trans['Saldo Acumulado Num'].tolist()
-        saldo_acum_str = []
-        for i, val in enumerate(saldo_acum):
-            seta = ''
-            if i == 0:
-                seta = '—'
-            else:
-                if val > saldo_acum[i-1]:
-                    seta = '<span class="seta-verde">▲</span>'
-                elif val < saldo_acum[i-1]:
-                    seta = '<span class="seta-vermelha">▼</span>'
-                else:
-                    seta = '—'
-            saldo_acum_str.append(f'{format_brl(val)} {seta}')
-        df_trans['Saldo Acumulado'] = saldo_acum_str
-
-        # Monta tabela HTML com estilos para tema escuro
         st.markdown('### Transações Detalhadas')
-        table_html = """
-        <style>
-        .trans-table {
-            width: 100%;
-            border-collapse: collapse;
-            color: #f0f2f6; /* Texto claro para tema escuro */
-            font-family: 'sans-serif';
-        }
-        .trans-table th, .trans-table td {
-            border: 1px solid #3a3f44;
-            padding: 8px 12px;
-            text-align: left;
-        }
-        .trans-table th {
-            background-color: #1a1f24; /* Cabeçalho mais escuro */
-        }
-        .trans-table tr:nth-child(even) {
-            background-color: #262c31; /* Listras para melhor leitura */
-        }
-        .pagamento {
-            color: #ff6961; /* Vermelho suave para pagamentos */
-            font-weight: bold;
-        }
-        .seta-verde {
-            color: #77dd77; /* Verde suave */
-            font-weight: bold;
-        }
-        .seta-vermelha {
-            color: #ff6961; /* Vermelho suave */
-            font-weight: bold;
-        }
-        </style>
-        <table class='trans-table'>
-            <tr>
-                <th>Data</th>
-                <th>Favorecido</th>
-                <th>Descrição</th>
-                <th>Categoria</th>
-                <th>Recebidos</th>
-                <th>Pagamentos</th>
-                <th>Saldo Acumulado</th>
-            </tr>
-        """
-        for _, row in df_trans.iterrows():
-            # Adiciona a classe 'pagamento' apenas se houver um valor de pagamento
-            pagamento_class = "class='pagamento'" if row['Pagamentos'] != 'R$ 0,00' else ""
-            table_html += f"""
-            <tr>
-                <td>{row['Data']}</td>
-                <td>{row['Favorecido']}</td>
-                <td>{row['Descrição']}</td>
-                <td>{row['Categoria']}</td>
-                <td>{row['Recebidos']}</td>
-                <td {pagamento_class}>{row['Pagamentos']}</td>
-                <td>{row['Saldo Acumulado']}</td>
-            </tr>
-            """
-        table_html += "</table>"
-        components.html(table_html, height=800, scrolling=True)
+        
+        # Carrega dados originais para CRUD
+        df_despesas_crud = crud_system.load_sheet_data('Despesas')
+        df_receitas_crud = crud_system.load_sheet_data('Receitas')
+        
+        # Aplica filtros aos dados CRUD
+        if not df_despesas_crud.empty:
+            df_despesas_crud['DATA'] = pd.to_datetime(df_despesas_crud['DATA'], errors='coerce')
+            df_despesas_crud = df_despesas_crud.dropna(subset=['DATA'])
+            df_despesas_crud['Ano'] = df_despesas_crud['DATA'].dt.year.astype(str)
+            df_despesas_crud['Mês'] = df_despesas_crud['DATA'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
+            
+            df_despesas_crud_filtrado = df_despesas_crud[
+                ((df_despesas_crud['CONTA'] == conta_selecionada) | (conta_selecionada == 'Todas')) &
+                (df_despesas_crud['Ano'].isin(anos_selecionados) if anos_selecionados else True) &
+                (df_despesas_crud['Mês'].isin(meses_selecionados) if meses_selecionados else True)
+            ]
+            
+            if 'Despesas' in tipos_selecionados and categoria_selecionada != 'Todas':
+                df_despesas_crud_filtrado = df_despesas_crud_filtrado[df_despesas_crud_filtrado['CATEGORIA'] == categoria_selecionada]
+        else:
+            df_despesas_crud_filtrado = pd.DataFrame()
+        
+        if not df_receitas_crud.empty:
+            df_receitas_crud['DATA'] = pd.to_datetime(df_receitas_crud['DATA'], errors='coerce')
+            df_receitas_crud = df_receitas_crud.dropna(subset=['DATA'])
+            df_receitas_crud['Ano'] = df_receitas_crud['DATA'].dt.year.astype(str)
+            df_receitas_crud['Mês'] = df_receitas_crud['DATA'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
+            
+            df_receitas_crud_filtrado = df_receitas_crud[
+                ((df_receitas_crud['CONTA'] == conta_selecionada) | (conta_selecionada == 'Todas')) &
+                (df_receitas_crud['Ano'].isin(anos_selecionados) if anos_selecionados else True) &
+                (df_receitas_crud['Mês'].isin(meses_selecionados) if meses_selecionados else True)
+            ]
+            
+            if 'Receitas' in tipos_selecionados and categoria_selecionada != 'Todas':
+                df_receitas_crud_filtrado = df_receitas_crud_filtrado[df_receitas_crud_filtrado['CATEGORIA'] == categoria_selecionada]
+        else:
+            df_receitas_crud_filtrado = pd.DataFrame()
+        
+        # Combina dados para exibição
+        df_trans_crud = pd.concat([
+            df_receitas_crud_filtrado.assign(TIPO='Receita'),
+            df_despesas_crud_filtrado.assign(TIPO='Despesa')
+        ], ignore_index=True)
+        
+        if not df_trans_crud.empty:
+            df_trans_crud = df_trans_crud.sort_values('DATA')
+            df_trans_crud['DATA'] = pd.to_datetime(df_trans_crud['DATA']).dt.strftime('%d/%m/%Y')
+            
+            # Formata valores para exibição
+            df_trans_crud['VALOR_FORMATADO'] = df_trans_crud['VALOR'].apply(format_brl)
+            
+            # Seleciona colunas para exibição
+            colunas_exibicao = ['DATA', 'TIPO', 'DESCRIÇÃO', 'CATEGORIA', 'CONTA', 'VALOR_FORMATADO']
+            if 'FAVORECIDO' in df_trans_crud.columns:
+                colunas_exibicao.insert(2, 'FAVORECIDO')
+            
+            df_exibicao = df_trans_crud[colunas_exibicao].copy()
+            df_exibicao = df_exibicao.rename(columns={
+                'DATA': 'Data',
+                'TIPO': 'Tipo',
+                'DESCRIÇÃO': 'Descrição',
+                'CATEGORIA': 'Categoria',
+                'CONTA': 'Conta',
+                'VALOR_FORMATADO': 'Valor',
+                'FAVORECIDO': 'Favorecido'
+            })
+            
+            # Exibe tabela com funcionalidades CRUD
+            st.dataframe(
+                df_exibicao,
+                use_container_width=True,
+                hide_index=True
+            )
+            
+            # Botões de ação CRUD
+            st.markdown('---')
+            col_crud1, col_crud2, col_crud3, col_crud4, col_crud5, col_crud6 = st.columns([1, 1, 1, 1, 1, 1])
+            
+            with col_crud1:
+                if st.button("➕ Nova Despesa", key="nova_despesa_transacao"):
+                    st.session_state.show_despesa_form = True
+            
+            with col_crud2:
+                if st.button("💰 Nova Receita", key="nova_receita_transacao"):
+                    st.session_state.show_receita_form = True
+            
+            with col_crud3:
+                if st.button("🛒 Nova Venda", key="nova_venda_transacao"):
+                    st.session_state.show_venda_form = True
+            
+            with col_crud4:
+                if st.button("✏️ Editar Transação", key="edit_transacao"):
+                    st.session_state.show_edit_transacao = True
+            
+            with col_crud5:
+                if st.button("🗑️ Excluir Transação", key="delete_transacao"):
+                    st.session_state.show_delete_transacao = True
+            
+            with col_crud6:
+                if st.button("🗑️ Exclusão em Lote", key="bulk_delete_transacao"):
+                    st.session_state.show_bulk_delete_transacao = True
+            
+            # Formulário de edição de transação
+            if st.session_state.get("show_edit_transacao", False):
+                st.markdown('### ✏️ Editar Transação')
+                
+                # Seleção do tipo de transação
+                tipo_transacao = st.selectbox("Tipo de Transação", ["Receita", "Despesa"], key="edit_tipo_transacao")
+                
+                if tipo_transacao == "Receita":
+                    df_edit = df_receitas_crud_filtrado
+                    sheet_name = "Receitas"
+                else:
+                    df_edit = df_despesas_crud_filtrado
+                    sheet_name = "Despesas"
+                
+                if not df_edit.empty:
+                    # Seleção da transação para editar
+                    opcoes_transacao = [f"{row['DATA'].strftime('%d/%m/%Y')} - {row['DESCRIÇÃO']} - {format_brl(row['VALOR'])}" 
+                                       for idx, row in df_edit.iterrows()]
+                    transacao_selecionada = st.selectbox("Selecionar transação para editar:", opcoes_transacao, key="edit_transacao_select")
+                    
+                    if transacao_selecionada:
+                        # Encontra o índice da transação selecionada
+                        idx_selecionado = opcoes_transacao.index(transacao_selecionada)
+                        row_to_edit = df_edit.iloc[idx_selecionado]
+                        
+                        with st.form("edit_transacao_form"):
+                            st.write("**Editar dados da transação:**")
+                            
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                nova_data = col1.date_input("Data", value=pd.to_datetime(row_to_edit['DATA']).date(), key="edit_data")
+                                nova_descricao = col1.text_input("Descrição", value=row_to_edit['DESCRIÇÃO'], key="edit_descricao")
+                            
+                            with col2:
+                                nova_categoria = col2.text_input("Categoria", value=row_to_edit['CATEGORIA'], key="edit_categoria")
+                                novo_valor = col2.number_input("Valor", value=float(row_to_edit['VALOR']), format="%.2f", key="edit_valor")
+                            
+                            if 'FAVORECIDO' in row_to_edit.index:
+                                novo_favorecido = st.text_input("Favorecido", value=row_to_edit['FAVORECIDO'] if pd.notna(row_to_edit['FAVORECIDO']) else "", key="edit_favorecido")
+                            
+                            col_submit, col_cancel = st.columns(2)
+                            submitted = col_submit.form_submit_button("💾 Salvar Alterações", use_container_width=True, type="primary")
+                            if col_cancel.form_submit_button("✖️ Cancelar", use_container_width=True):
+                                st.session_state.show_edit_transacao = False
+                                st.rerun()
+                            
+                            if submitted:
+                                # Atualiza os dados
+                                updated_data = {
+                                    'DATA': pd.to_datetime(nova_data),
+                                    'DESCRIÇÃO': nova_descricao,
+                                    'CATEGORIA': nova_categoria,
+                                    'VALOR': novo_valor
+                                }
+                                
+                                if 'FAVORECIDO' in row_to_edit.index:
+                                    updated_data['FAVORECIDO'] = novo_favorecido
+                                
+                                # Encontra o índice original no dataframe completo
+                                original_idx = df_edit.index[idx_selecionado]
+                                success, message = crud_system.update_record(sheet_name, original_idx, updated_data)
+                                
+                                if success:
+                                    st.success("Transação atualizada com sucesso!")
+                                    st.session_state.show_edit_transacao = False
+                                    st.rerun()
+                                else:
+                                    st.error(f"Erro ao atualizar transação: {message}")
+                else:
+                    st.info(f"Nenhuma {tipo_transacao.lower()} encontrada com os filtros selecionados.")
+            
+            # Formulário de exclusão de transação
+            if st.session_state.get("show_delete_transacao", False):
+                st.markdown('### 🗑️ Excluir Transação')
+                
+                tipo_transacao = st.selectbox("Tipo de Transação", ["Receita", "Despesa"], key="delete_tipo_transacao")
+                
+                if tipo_transacao == "Receita":
+                    df_delete = df_receitas_crud_filtrado
+                    sheet_name = "Receitas"
+                else:
+                    df_delete = df_despesas_crud_filtrado
+                    sheet_name = "Despesas"
+                
+                if not df_delete.empty:
+                    opcoes_transacao = [f"{row['DATA'].strftime('%d/%m/%Y')} - {row['DESCRIÇÃO']} - {format_brl(row['VALOR'])}" 
+                                       for idx, row in df_delete.iterrows()]
+                    transacao_selecionada = st.selectbox("Selecionar transação para excluir:", opcoes_transacao, key="delete_transacao_select")
+                    
+                    if st.button("🗑️ Confirmar Exclusão", key="confirm_delete_transacao"):
+                        if transacao_selecionada:
+                            idx_selecionado = opcoes_transacao.index(transacao_selecionada)
+                            original_idx = df_delete.index[idx_selecionado]
+                            success, message = crud_system.delete_record(sheet_name, original_idx)
+                            
+                            if success:
+                                st.success("Transação excluída com sucesso!")
+                                st.session_state.show_delete_transacao = False
+                                st.rerun()
+                            else:
+                                st.error(f"Erro ao excluir transação: {message}")
+                else:
+                    st.info(f"Nenhuma {tipo_transacao.lower()} encontrada com os filtros selecionados.")
+        
+        # Formulário de exclusão em lote de transações
+        if st.session_state.get("show_bulk_delete_transacao", False):
+            st.markdown('### 🗑️ Exclusão em Lote - Transações')
+            
+            # Seleção do tipo de transação
+            tipo_transacao = st.selectbox("Tipo de Transação", ["Receita", "Despesa"], key="bulk_delete_tipo_transacao")
+            
+            if tipo_transacao == "Receita":
+                df_bulk_delete = df_receitas_crud_filtrado
+                sheet_name = "Receitas"
+            else:
+                df_bulk_delete = df_despesas_crud_filtrado
+                sheet_name = "Despesas"
+            
+            if not df_bulk_delete.empty:
+                # Criar opções para seleção múltipla
+                opcoes_transacao = [f"{row['DATA'].strftime('%d/%m/%Y')} - {row['DESCRIÇÃO']} - {format_brl(row['VALOR'])}" 
+                                   for idx, row in df_bulk_delete.iterrows()]
+                
+                transacoes_selecionadas = st.multiselect("Selecionar transações para excluir:", opcoes_transacao, key="bulk_delete_transacao_select")
+                
+                if transacoes_selecionadas:
+                    st.warning(f"⚠️ Você está prestes a excluir {len(transacoes_selecionadas)} transação(ões). Esta ação não pode ser desfeita!")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("🗑️ Confirmar Exclusão em Lote", key="confirm_bulk_delete_transacao", type="primary"):
+                            success_count = 0
+                            error_count = 0
+                            
+                            for transacao_selecionada in transacoes_selecionadas:
+                                idx_selecionado = opcoes_transacao.index(transacao_selecionada)
+                                original_idx = df_bulk_delete.index[idx_selecionado]
+                                success, message = crud_system.delete_record(sheet_name, original_idx)
+                                
+                                if success:
+                                    success_count += 1
+                                else:
+                                    error_count += 1
+                            
+                            if success_count > 0:
+                                st.success(f"✅ {success_count} transação(ões) excluída(s) com sucesso!")
+                            if error_count > 0:
+                                st.error(f"❌ {error_count} transação(ões) não puderam ser excluída(s).")
+                            
+                            st.session_state.show_bulk_delete_transacao = False
+                            st.rerun()
+                    
+                    with col2:
+                        if st.button("✖️ Cancelar", key="cancel_bulk_delete_transacao"):
+                            st.session_state.show_bulk_delete_transacao = False
+                            st.rerun()
+            else:
+                st.info(f"Nenhuma {tipo_transacao.lower()} encontrada com os filtros selecionados.")
+        else:
+            st.info("Nenhuma transação encontrada com os filtros selecionados.")
 
     elif selected == "Para onde vai":
         st.markdown('### Gráfico de Pareto das Despesas por Categoria')
@@ -1343,6 +1534,26 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
             df_tab = df_tab.rename(columns={'DATA':'Data','CONTA':'Conta','TIPO DE RECEBIMENTO':'Tipo de Recebimento','VALOR':'Valor','Status':'Status'})
             df_tab['Valor'] = df_tab['Valor'].apply(format_brl)
             st.dataframe(df_tab[['Data','Cliente','Conta','Tipo de Recebimento','Valor','Status']], use_container_width=True, hide_index=True)
+            
+            # Botões de ação CRUD para Vendas
+            st.markdown('---')
+            col_crud1, col_crud2, col_crud3, col_crud4, col_crud5, col_crud6 = st.columns([1, 1, 1, 1, 1, 1])
+            
+            with col_crud1:
+                if st.button("🛒 Nova Venda", key="nova_venda"):
+                    st.session_state.show_venda_form = True
+            
+            with col_crud2:
+                if st.button("✏️ Editar Venda", key="edit_venda"):
+                    st.session_state.show_edit_Vendas = True
+            
+            with col_crud3:
+                if st.button("🗑️ Excluir Venda", key="delete_venda"):
+                    st.session_state.show_delete_Vendas = True
+            
+            with col_crud4:
+                if st.button("🗑️ Exclusão em Lote", key="bulk_delete_venda"):
+                    st.session_state.show_bulk_delete_Vendas = True
         else:
             st.info('Não há vendas para exibir na tabela.')
 
@@ -1524,474 +1735,262 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
             df_tab['Preço Médio'] = df_tab['Preço Médio'].apply(format_brl)
             st.dataframe(
                 df_tab[['Data','Tipo','Ativo','Valor Aportado','Quantidade','Preço Médio','Objetivo']], 
-                use_container_width=True, 
+                use_container_width=True,
                 hide_index=True
             )
+            
+            # Botões de ação CRUD para Investimentos
+            st.markdown('---')
+            col_crud1, col_crud2, col_crud3, col_crud4 = st.columns([1, 1, 1, 1])
+            
+            with col_crud1:
+                if st.button("💰 Novo Investimento", key="novo_investimento"):
+                    st.session_state.show_investimento_form = True
+            
+            with col_crud2:
+                if st.button("✏️ Editar Investimento", key="edit_investimento"):
+                    st.session_state.show_edit_Investimentos = True
+            
+            with col_crud3:
+                if st.button("🗑️ Excluir Investimento", key="delete_investimento"):
+                    st.session_state.show_delete_Investimentos = True
+            
+            with col_crud4:
+                if st.button("🗑️ Exclusão em Lote", key="bulk_delete_investimento"):
+                    st.session_state.show_bulk_delete_Investimentos = True
         else:
-            st.info('Não há investimentos para exibir na tabela.') 
+            st.info('Não há investimentos para exibir na tabela.')
 
     # --- GRUPO DE ANÁLISE DE CARTÃO DE CRÉDITO ---
     elif selected == "Cartão de Crédito":
         st.markdown('## 💳 Análise de Cartão de Crédito')
-        
-        st.markdown("---")
-        
-        # Carregar dados
-        df_cc = pd.read_excel(xls, sheet_name='Div_CC')
-        df_cc['Data'] = pd.to_datetime(df_cc['Data'], errors='coerce')
-        df_cc.dropna(subset=['Data'], inplace=True)
-        df_cc['Ano'] = df_cc['Data'].dt.year.astype(str)
-        df_cc['Mês'] = df_cc['Data'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
-        
-        # Aplicar filtros usando as variáveis da sidebar
-        cc_filtrado = df_cc[
-            (df_cc['Ano'].isin(st.session_state.ano_cc_sidebar) if st.session_state.ano_cc_sidebar else True) &
-            (df_cc['Mês'].isin(st.session_state.mes_cc_sidebar) if st.session_state.mes_cc_sidebar else True) &
-            ((df_cc['Cartão'] == st.session_state.cartao_cc_sidebar) | (st.session_state.cartao_cc_sidebar == 'Todos')) &
-            ((df_cc['Situação'] == st.session_state.situacao_cc_sidebar) | (st.session_state.situacao_cc_sidebar == 'Todas')) &
-            ((df_cc['Tipo de Compra'] == st.session_state.tipo_compra_cc_sidebar) | (st.session_state.tipo_compra_cc_sidebar == 'Todos')) &
-            ((df_cc['Quantidade de parcelas'].astype(str) == st.session_state.parcelas_cc_sidebar) | (st.session_state.parcelas_cc_sidebar == 'Todas'))
-        ]
 
-        # Exibir KPIs
-        if cc_filtrado.empty:
-            st.info("Não há dados para exibir com os filtros selecionados.")
-        else:
-            st.markdown("---")
-            total_compras = cc_filtrado['valor total da compra'].sum()
-            total_parcelas = cc_filtrado['Valor das parcelas'].sum()
-            qtd_compras = len(cc_filtrado)
-            media_compra = total_compras / qtd_compras if qtd_compras > 0 else 0
-            total_pago = cc_filtrado[cc_filtrado['Situação'] == 'Pago']['valor total da compra'].sum()
-            total_pendente = cc_filtrado[cc_filtrado['Situação'] == 'Pendente']['valor total da compra'].sum()
+        # Carregar e processar dados de CC
+        try:
+            df_cc = pd.read_excel(xls, sheet_name='Div_CC')
+            if not df_cc.empty:
+                df_cc['Data'] = pd.to_datetime(df_cc['Data'], errors='coerce')
+                df_cc.dropna(subset=['Data'], inplace=True)
+                df_cc['Ano'] = df_cc['Data'].dt.year.astype(str)
+                df_cc['Mês'] = df_cc['Data'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
 
-            # Calcular próximas faturas
-            hoje = datetime.now()
-            
-            # Filtra compras pendentes com vencimento futuro
-            proximas_faturas = cc_filtrado[
-                (cc_filtrado['Situação'] == 'Pendente') & 
-                (pd.to_datetime(cc_filtrado['Vencimento da Fatura']) > hoje)
-            ]
-            
-            # Agrupa por vencimento e soma os valores
-            if not proximas_faturas.empty:
-                proximas_faturas['Vencimento da Fatura'] = pd.to_datetime(proximas_faturas['Vencimento da Fatura'])
-                faturas_por_vencimento = proximas_faturas.groupby('Vencimento da Fatura')['valor total da compra'].sum().sort_index()
+                # Exibe os filtros na sidebar
+                st.sidebar.header("Filtros Cartão de Crédito")
                 
-                # Pega as próximas 3 faturas
-                proximas_3_faturas = faturas_por_vencimento.head(3)
-                total_proximas_faturas = proximas_3_faturas.sum()
+                anos_disponiveis = sorted(df_cc['Ano'].unique())
+                anos_selecionados_cc = st.sidebar.multiselect('Ano', anos_disponiveis, default=anos_disponiveis, key='cc_ano_multiselect')
                 
-                # Formata as próximas faturas para exibição
-                proximas_faturas_texto = []
-                for vencimento, valor in proximas_3_faturas.items():
-                    data_str = vencimento.strftime('%d/%m/%Y')
-                    valor_str = format_brl(valor)
-                    proximas_faturas_texto.append(f"{data_str}: {valor_str}")
+                meses_disponiveis = sorted(df_cc['Mês'].unique())
+                meses_selecionados_cc = st.sidebar.multiselect('Mês', meses_disponiveis, default=[], key='cc_mes_multiselect')
                 
-                proximas_faturas_display = "<br>".join(proximas_faturas_texto) if proximas_faturas_texto else "Nenhuma fatura pendente"
-            else:
-                total_proximas_faturas = 0
-                proximas_faturas_display = "Nenhuma fatura pendente"
+                cartoes_disponiveis = ['Todos'] + sorted(df_cc['Cartão'].unique().tolist())
+                cartao_selecionado = st.sidebar.selectbox('Cartão', cartoes_disponiveis, key='cc_cartao_select')
+                
+                situacoes_disponiveis = ['Todas'] + sorted(df_cc['Situação'].unique().tolist())
+                situacao_selecionada = st.sidebar.selectbox('Situação', situacoes_disponiveis, key='cc_situacao_select')
+                
+                tipos_compra_disponiveis = ['Todos'] + sorted(df_cc['Tipo de Compra'].unique().tolist())
+                tipo_compra_selecionado = st.sidebar.selectbox('Tipo de Compra', tipos_compra_disponiveis, key='cc_tipo_compra_select')
 
-            col1, col2, col3, col4, col5, col6 = st.columns(6)
-            col1.metric("Total das Compras", format_brl(total_compras))
-            col2.metric("Total Pago", format_brl(total_pago))
-            col3.metric("Total Pendente", format_brl(total_pendente))
-            col4.metric("Qtd. Compras", qtd_compras)
-            col5.metric("Valor Médio", format_brl(media_compra))
-            
-            # Card especial para próximas faturas
-            with col6:
-                st.markdown(f"""
-                <div class="metric-card" style="background: linear-gradient(to right, #ff6b6b, #ee5a24);">
-                    <h4>Próximas Faturas</h4>
-                    <h2>{format_brl(total_proximas_faturas)}</h2>
-                    <div style="font-size: 0.8rem; margin-top: 8px; opacity: 0.9;">
-                        {proximas_faturas_display}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                # Aplicar filtros
+                df_cc_filtrado = df_cc.copy()
+                if anos_selecionados_cc:
+                    df_cc_filtrado = df_cc_filtrado[df_cc_filtrado['Ano'].isin(anos_selecionados_cc)]
+                if meses_selecionados_cc:
+                    df_cc_filtrado = df_cc_filtrado[df_cc_filtrado['Mês'].isin(meses_selecionados_cc)]
+                if cartao_selecionado != 'Todos':
+                    df_cc_filtrado = df_cc_filtrado[df_cc_filtrado['Cartão'] == cartao_selecionado]
+                if situacao_selecionada != 'Todas':
+                    df_cc_filtrado = df_cc_filtrado[df_cc_filtrado['Situação'] == situacao_selecionada]
+                if tipo_compra_selecionado != 'Todos':
+                    df_cc_filtrado = df_cc_filtrado[df_cc_filtrado['Tipo de Compra'] == tipo_compra_selecionado]
 
-            # Exibir Gráficos
-            st.markdown("---")
-            colg1, colg2 = st.columns(2)
+                # Cards de resumo
+                total_gasto_cc = df_cc_filtrado['valor total da compra'].sum()
+                proxima_fatura = df_cc_filtrado[df_cc_filtrado['Situação'] == 'Pendente']['valor total da compra'].sum()
+                media_mensal = total_gasto_cc / (len(anos_selecionados_cc) * 12) if anos_selecionados_cc else 0
 
-            with colg1:
-                st.markdown('#### Gastos por Cartão')
-                gastos_cartao = cc_filtrado.groupby('Cartão')['valor total da compra'].sum().sort_values(ascending=False)
-                if not gastos_cartao.empty:
-                    fig_cartao = px.bar(
-                        gastos_cartao,
-                        x=gastos_cartao.index,
-                        y=gastos_cartao.values,
-                        title='Gastos Totais por Cartão',
-                        labels={'y': 'Valor Total (R$)', 'index': 'Cartão'},
-                        text=gastos_cartao.apply(lambda x: format_brl(x))
-                    )
-                    fig_cartao.update_layout(showlegend=False, xaxis_title="", yaxis_title="Valor (R$)", title_x=0.2)
-                    st.plotly_chart(fig_cartao, use_container_width=True)
-                else:
-                    st.info("Sem dados para o gráfico de cartões.")
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Total Gasto (Filtrado)", format_brl(total_gasto_cc))
+                col2.metric("Próxima Fatura (Pendente)", format_brl(proxima_fatura))
+                col3.metric("Média Mensal (Filtrado)", format_brl(media_mensal))
 
-            with colg2:
-                st.markdown('#### Gastos por Tipo de Compra')
-                gastos_tipo = cc_filtrado.groupby('Tipo de Compra')['valor total da compra'].sum().sort_values(ascending=False)
-                if not gastos_tipo.empty:
-                    fig_tipo = px.pie(
-                        names=gastos_tipo.index,
-                        values=gastos_tipo.values,
-                        title='Distribuição por Tipo de Compra',
-                        hole=0.4
-                    )
-                    fig_tipo.update_traces(textposition='inside', textinfo='percent+label')
-                    fig_tipo.update_layout(showlegend=False, title_x=0.2)
-                    st.plotly_chart(fig_tipo, use_container_width=True)
-                else:
-                    st.info("Sem dados para o gráfico de tipos de compra.")
+                st.markdown("---")
 
-            # Segunda linha de gráficos
-            st.markdown("---")
-            colg3, colg4 = st.columns(2)
-
-            with colg3:
-                st.markdown('#### Distribuição por Situação')
-                situacao_dist = cc_filtrado.groupby('Situação')['valor total da compra'].sum()
-                if not situacao_dist.empty:
-                    fig_sit = px.pie(
-                        names=situacao_dist.index,
-                        values=situacao_dist.values,
-                        title='Distribuição por Situação',
-                        hole=0.4
-                    )
-                    fig_sit.update_traces(textposition='inside', textinfo='percent+label')
-                    fig_sit.update_layout(showlegend=False, title_x=0.2)
-                    st.plotly_chart(fig_sit, use_container_width=True)
-                else:
-                    st.info("Sem dados para o gráfico de situação.")
-
-            with colg4:
-                st.markdown('#### Distribuição por Parcelas')
-                parcelas_dist = cc_filtrado.groupby('Quantidade de parcelas')['valor total da compra'].sum().sort_values(ascending=False)
-                if not parcelas_dist.empty:
-                    fig_parc = px.bar(
-                        x=parcelas_dist.index.astype(str),
-                        y=parcelas_dist.values,
-                        title='Gastos por Quantidade de Parcelas',
-                        labels={'x': 'Quantidade de Parcelas', 'y': 'Valor Total (R$)'},
-                        text=parcelas_dist.apply(lambda x: format_brl(x))
-                    )
-                    fig_parc.update_layout(showlegend=False, xaxis_title="", yaxis_title="Valor (R$)", title_x=0.2)
-                    st.plotly_chart(fig_parc, use_container_width=True)
-                else:
-                    st.info("Sem dados para o gráfico de parcelas.")
-
-            st.markdown("---")
-            st.markdown('#### Evolução dos Gastos no Cartão')
-            evolucao_gastos = cc_filtrado.groupby(['Ano', 'Mês'])['valor total da compra'].sum().reset_index()
-            meses_ordem = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-            evolucao_gastos['MêsNum'] = pd.Categorical(evolucao_gastos['Mês'], categories=meses_ordem, ordered=True)
-            evolucao_gastos = evolucao_gastos.sort_values(['Ano', 'MêsNum'])
-            evolucao_gastos['MêsAno'] = evolucao_gastos['Mês'] + '/' + evolucao_gastos['Ano'].astype(str)
-
-            if not evolucao_gastos.empty:
-                fig_evol = px.line(
-                    evolucao_gastos,
-                    x='MêsAno',
-                    y='valor total da compra',
-                    title='Evolução Mensal dos Gastos',
-                    labels={'valor total da compra': 'Valor Total (R$)', 'MêsAno': 'Mês/Ano'},
-                    markers=True
-                )
-                fig_evol.update_traces(text=evolucao_gastos['valor total da compra'].apply(lambda x: format_brl(x)), textposition="top center")
-                fig_evol.update_layout(xaxis_title="", yaxis_title="Valor (R$)", title_x=0.1)
-                st.plotly_chart(fig_evol, use_container_width=True)
-            else:
-                st.info("Sem dados para o gráfico de evolução.")
-
-            # Gráfico de próximas faturas por cartão
-            st.markdown("---")
-            st.markdown('#### Próximas Faturas por Cartão')
-            if not proximas_faturas.empty:
-                proximas_por_cartao = proximas_faturas.groupby('Cartão')['valor total da compra'].sum().sort_values(ascending=False)
-                fig_proximas = px.bar(
-                    proximas_por_cartao,
-                    x=proximas_por_cartao.index,
-                    y=proximas_por_cartao.values,
-                    title='Valor das Próximas Faturas por Cartão',
-                    labels={'y': 'Valor da Fatura (R$)', 'index': 'Cartão'},
-                    text=proximas_por_cartao.apply(lambda x: format_brl(x))
-                )
-                fig_proximas.update_layout(showlegend=False, xaxis_title="", yaxis_title="Valor (R$)", title_x=0.2)
-                st.plotly_chart(fig_proximas, use_container_width=True)
-            else:
-                st.info("Não há faturas pendentes para exibir.")
-
-            # Exibir Tabela detalhada
-            st.markdown("---")
-            st.markdown('#### Detalhes das Compras')
-            df_tabela_cc = cc_filtrado.copy()
-            df_tabela_cc['Data'] = df_tabela_cc['Data'].dt.strftime('%d/%m/%Y')
-            df_tabela_cc['Vencimento da Fatura'] = pd.to_datetime(df_tabela_cc['Vencimento da Fatura']).dt.strftime('%d/%m/%Y')
-            df_tabela_cc['valor total da compra'] = df_tabela_cc['valor total da compra'].apply(format_brl)
-            df_tabela_cc['Valor das parcelas'] = df_tabela_cc['Valor das parcelas'].apply(format_brl)
-            st.dataframe(
-                df_tabela_cc[['Data', 'Descrição', 'Tipo de Compra', 'Cartão', 'Quantidade de parcelas', 'Valor das parcelas', 'valor total da compra', 'Situação', 'Vencimento da Fatura']],
-                use_container_width=True,
-                hide_index=True,
-            )
-            
-            # Botão de exportação de relatório (movido para o final)
-            st.markdown("---")
-            col1, col2, col3 = st.columns([1, 1, 1])
-            with col2:
-                if st.button("📄 Exportar Relatório PDF", type="primary", use_container_width=True):
-                    # Criar instância do gerador de relatórios
-                    relatorio = RelatorioPDF()
+                # Tabela de detalhes
+                with st.container():
+                    st.markdown("#### Detalhes das Compras")
                     
-                    # Preparar dados para o relatório
-                    dados_relatorio = {
-                        'total_compras': total_compras,
-                        'total_pago': total_pago,
-                        'total_pendente': total_pendente,
-                        'qtd_compras': qtd_compras,
-                        'media_compra': media_compra,
-                        'proximas_faturas': total_proximas_faturas,
-                        'graficos': [],
-                        'tabela_compras': cc_filtrado[['Data', 'Cartão', 'Descrição', 'valor total da compra', 'Situação', 'Tipo de Compra', 'Quantidade de parcelas']].copy()
-                    }
+                    df_exibicao_cc = df_cc_filtrado[['Data', 'Descrição', 'valor total da compra', 'Situação', 'Cartão', 'Tipo de Compra', 'Quantidade de parcelas', 'id']].rename(columns={'valor total da compra': 'Valor', 'Quantidade de parcelas': 'Parcelas'})
                     
-                    # Adicionar gráficos se existirem dados
-                    if not cc_filtrado.empty:
-                        # Gráfico de gastos por cartão
-                        gastos_cartao = cc_filtrado.groupby('Cartão')['valor total da compra'].sum().sort_values(ascending=False)
-                        if not gastos_cartao.empty:
-                            fig_cartao = px.bar(
-                                gastos_cartao,
-                                x=gastos_cartao.index,
-                                y=gastos_cartao.values,
-                                title='Gastos Totais por Cartão',
-                                labels={'y': 'Valor Total (R$)', 'index': 'Cartão'},
-                                text=gastos_cartao.apply(lambda x: format_brl(x))
-                            )
-                            dados_relatorio['graficos'].append({
-                                'titulo': 'Gastos Totais por Cartão',
-                                'fig': fig_cartao,
-                                'descricao': 'Distribuição dos gastos por cartão de crédito'
-                            })
-                        
-                        # Gráfico de evolução mensal
-                        evolucao_gastos = cc_filtrado.groupby(['Ano', 'Mês'])['valor total da compra'].sum().reset_index()
-                        meses_ordem = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-                        evolucao_gastos['MêsNum'] = pd.Categorical(evolucao_gastos['Mês'], categories=meses_ordem, ordered=True)
-                        evolucao_gastos = evolucao_gastos.sort_values(['Ano', 'MêsNum'])
-                        evolucao_gastos['MêsAno'] = evolucao_gastos['Mês'] + '/' + evolucao_gastos['Ano'].astype(str)
-                        
-                        if not evolucao_gastos.empty:
-                            fig_evol = px.line(
-                                evolucao_gastos,
-                                x='MêsAno',
-                                y='valor total da compra',
-                                title='Evolução Mensal dos Gastos',
-                                labels={'valor total da compra': 'Valor Total (R$)', 'MêsAno': 'Mês/Ano'},
-                                markers=True
-                            )
-                            dados_relatorio['graficos'].append({
-                                'titulo': 'Evolução Mensal dos Gastos',
-                                'fig': fig_evol,
-                                'descricao': 'Análise da evolução dos gastos no cartão de crédito ao longo do tempo'
-                            })
-                    
-                    # Gerar relatório
-                    try:
-                        filename = relatorio.generate_credit_card_report(dados_relatorio, "relatorio_cartao_credito.pdf")
-                        st.success("✅ Relatório gerado com sucesso!")
-                        create_download_button(filename, "📥 Download Relatório Cartão de Crédito")
-                    except Exception as e:
-                        st.error(f"❌ Erro ao gerar relatório: {e}")
+                    if not df_exibicao_cc.empty:
+                        # Aplica a formatação de moeda na coluna 'Valor'
+                        df_exibicao_cc['Valor'] = df_exibicao_cc['Valor'].apply(format_brl)
+                        st.dataframe(df_exibicao_cc, use_container_width=True, hide_index=True)
+                    else:
+                        st.info('Não há compras para exibir na tabela com os filtros selecionados.')
+
+                # Botões de ação CRUD e Relatório
+                st.markdown('---')
+                col_crud1, col_crud2, col_crud3, col_crud4, col_crud5 = st.columns([1.2, 1, 1, 1.2, 1.5])
+                with col_crud1:
+                    if st.button("💳 Nova Compra (CC)", key="nova_compra_cc_main", use_container_width=True):
+                        st.session_state.show_cc_form = True
+                with col_crud2:
+                    if st.button("✏️ Editar", key="edit_compra_cc_main", use_container_width=True, disabled=df_exibicao_cc.empty):
+                        st.session_state.show_edit_Div_CC = True
+                with col_crud3:
+                    if st.button("🗑️ Excluir", key="delete_compra_cc_main", use_container_width=True, disabled=df_exibicao_cc.empty):
+                        st.session_state.show_delete_Div_CC = True
+                with col_crud4:
+                    if st.button("🗑️ Excluir em Lote", key="lote_compra_cc_main", use_container_width=True, disabled=df_exibicao_cc.empty):
+                        st.session_state.show_delete_lote_cc = True
+                with col_crud5:
+                    if not df_exibicao_cc.empty:
+                        try:
+                            # Instancia o relatório e gera o PDF
+                            relatorio = RelatorioPDF()
+                            pdf_buffer = relatorio.gerar_pdf_compras(df_exibicao_cc, total_gasto_cc, proxima_fatura, media_mensal)
+                            st.download_button(label="📄 Exportar Relatório PDF", data=pdf_buffer, file_name="relatorio_compras_cc.pdf", mime="application/pdf", use_container_width=True)
+                        except Exception as e:
+                            st.error(f"❌ Erro ao gerar PDF: {e}")
+                    else:
+                        st.button("📄 Exportar Relatório PDF", use_container_width=True, disabled=True)
+            else:
+                st.info("Não há dados de compras de cartão de crédito para exibir.")
+                if st.button("💳 Nova Compra (CC)", key="nova_compra_cc_main_no_data"):
+                    st.session_state.show_cc_form = True
+
+        except FileNotFoundError:
+            st.error("A aba 'Div_CC' não foi encontrada na planilha. Verifique o arquivo 'Base_financas.xlsx'.")
+        except Exception as e:
+            st.error(f"Ocorreu um erro ao carregar os dados do cartão de crédito: {e}")
 
     # --- GRUPO DE ANÁLISE DE ORÇAMENTO ---
     elif selected == "Orçamento":
-        st.header("📊 Módulo de Orçamento Mensal")
-        st.markdown("---")
-        
-        # Carregar configuração de orçamento
+        st.markdown("## 📊 Análise de Orçamento Mensal")
+
         try:
             df_orcamento = pd.read_excel(xls, sheet_name='Orcamento')
-        except:
-            st.error("Aba 'Orcamento' não encontrada. Execute o script 'criar_aba_orcamento.py' primeiro.")
+            if 'Categoria' not in df_orcamento.columns or 'Percentual' not in df_orcamento.columns:
+                st.error("A aba 'Orcamento' deve conter as colunas 'Categoria' and 'Percentual'.")
+                st.stop()
+        except ValueError:
+            st.warning("A aba 'Orcamento' não foi encontrada na sua planilha 'Base_financas.xlsx'.")
+            st.info("Para usar esta funcionalidade, por favor, crie uma aba chamada 'Orcamento' com as colunas 'Categoria' e 'Percentual' (ex: Moradia, 30).")
             st.stop()
-        
-        # Calcular renda líquida (receitas - despesas "Confeitaria")
-        receitas_mes = receitas_filtradas['VALOR'].sum()
-        despesas_confeitaria = despesas_filtradas[despesas_filtradas['CATEGORIA'] == 'Confeitaria']['VALOR'].sum()
-        renda_liquida = receitas_mes - abs(despesas_confeitaria)
-        
-        # Cards de resumo
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("💰 Receitas do Mês", format_brl(receitas_mes))
-        with col2:
-            st.metric("🍰 Despesas Confeitaria", format_brl(abs(despesas_confeitaria)))
-        with col3:
-            st.metric("💵 Renda Líquida", format_brl(renda_liquida))
-        
+
+        # Garante que os filtros de período (mês/ano) sejam selecionados
+        if not anos_selecionados or not meses_selecionados:
+            st.info("👈 Por favor, selecione pelo menos um Ano e um Mês na barra lateral para calcular o orçamento.")
+            st.stop()
+            
+        # 1. Filtra os dados de receita e despesa para o período selecionado, sem filtro de categoria
+        receitas_periodo = receitas[
+            ((receitas['CONTA'] == conta_selecionada) | (conta_selecionada == 'Todas')) &
+            (receitas['Ano'].isin(anos_selecionados)) &
+            (receitas['Mês'].isin(meses_selecionados))
+        ]
+        despesas_periodo = despesas[
+            ((despesas['CONTA'] == conta_selecionada) | (conta_selecionada == 'Todas')) &
+            (despesas['Ano'].isin(anos_selecionados)) &
+            (despesas['Mês'].isin(meses_selecionados))
+        ]
+
+        # 2. Calcula a Renda Líquida Base para o orçamento
+        total_receitas_periodo = receitas_periodo['VALOR'].sum()
+        # Assume que 'Confeitaria' é um custo de negócio, a ser deduzido das receitas
+        custos_negocio = despesas_periodo[despesas_periodo['CATEGORIA'] == 'Confeitaria']['VALOR'].sum()
+        renda_liquida_base = total_receitas_periodo + custos_negocio # Custos já são negativos
+
+        st.metric(
+            "Renda Líquida para Orçamento (Receitas - Custos de 'Confeitaria')",
+            format_brl(renda_liquida_base)
+        )
+        st.caption(f"Cálculo: {format_brl(total_receitas_periodo)} (Receitas) - {format_brl(abs(custos_negocio))} (Custos Confeitaria)")
+
         st.markdown("---")
-        
-        # Título da seção de orçamento
-        st.subheader("🎯 Orçamento por Categoria")
-        st.markdown(f"*Baseado em {format_brl(renda_liquida)} de renda líquida*")
-        
-        # Criar colunas para o layout
-        col_orc, col_prog = st.columns([1, 2])
-        
-        with col_orc:
-            st.markdown("**📋 Configuração do Orçamento**")
+
+        if renda_liquida_base > 0:
+            # 3. Calcula os gastos reais por categoria (excluindo os custos de negócio)
+            gastos_reais_cat = despesas_periodo[despesas_periodo['CATEGORIA'] != 'Confeitaria'].groupby('CATEGORIA')['VALOR'].sum().abs().reset_index()
+            gastos_reais_cat = gastos_reais_cat.rename(columns={'VALOR': 'Gasto', 'CATEGORIA': 'Categoria'})
+
+            # 4. Cria a tabela de análise do orçamento
+            df_analise = df_orcamento.merge(gastos_reais_cat, on='Categoria', how='left')
+            df_analise['Gasto'] = df_analise['Gasto'].fillna(0)
+            df_analise['Orcado'] = (df_analise['Percentual'] / 100) * renda_liquida_base
+            df_analise['Saldo'] = df_analise['Orcado'] - df_analise['Gasto']
             
-            # Tabela com as porcentagens
-            df_orc_display = df_orcamento.copy()
-            df_orc_display['Valor Orçado'] = (df_orc_display['Porcentagem'] / 100) * renda_liquida
-            df_orc_display['Valor Orçado'] = df_orc_display['Valor Orçado'].round(2)
+            # Evita divisão por zero se o orçado for 0
+            df_analise['%_Uso'] = (df_analise['Gasto'] / df_analise['Orcado'].replace(0, np.nan)) * 100
+            df_analise['%_Uso'] = df_analise['%_Uso'].fillna(0)
+
+            # 5. Exibe o progresso por categoria
+            st.markdown("### Progresso por Categoria")
+            for _, row in df_analise.sort_values(by='Percentual', ascending=False).iterrows():
+                st.markdown(f"**{row['Categoria']}** ({row['Percentual']}% do orçamento)")
+                col1, col2 = st.columns([3, 1])
+                
+                # Barra de progresso visual
+                percent_usage_visual = min(row['%_Uso'] / 100, 1.0)
+                prog_bar = col1.progress(percent_usage_visual)
+                
+                # Define a cor da barra de progresso
+                if row['%_Uso'] > 100:
+                    prog_bar.empty()
+                    col1.error(f"Orçamento estourado em {format_brl(abs(row['Saldo']))}!")
+                
+                # Métrica de status
+                delta_color = "normal" if row['Saldo'] >= 0 else "inverse"
+                col2.metric(
+                    label=f"Gasto de {format_brl(row['Gasto'])}",
+                    value=f"{row['%_Uso']:.1f}%",
+                    delta=f"Saldo: {format_brl(row['Saldo'])}",
+                    delta_color=delta_color
+                )
             
+            st.markdown("---")
+
+            # 6. Gráfico de Comparação
+            st.markdown("### Gráfico: Orçado vs. Gasto")
+            df_plot = df_analise.melt(
+                id_vars=['Categoria'],
+                value_vars=['Orcado', 'Gasto'],
+                var_name='Tipo',
+                value_name='Valor'
+            )
+            fig_orcamento = px.bar(
+                df_plot,
+                x='Categoria',
+                y='Valor',
+                color='Tipo',
+                barmode='group',
+                title='Comparativo Orçado vs. Gasto por Categoria',
+                labels={'Valor': 'Valor (R$)', 'Categoria': 'Categoria'},
+                text_auto='.2s'
+            )
+            fig_orcamento.update_traces(textposition='outside')
+            fig_orcamento.update_layout(yaxis_tickformat="R$,.2f")
+            st.plotly_chart(fig_orcamento, use_container_width=True)
+
+            # 7. Tabela Detalhada
+            st.markdown("### Tabela de Acompanhamento")
+            df_display = df_analise[['Categoria', 'Percentual', 'Orcado', 'Gasto', 'Saldo', '%_Uso']]
             st.dataframe(
-                df_orc_display[['Categoria', 'Porcentagem', 'Valor Orçado']],
+                df_display.style
+                .format({
+                    'Percentual': '{:.1f}%',
+                    'Orcado': 'R$ {:,.2f}',
+                    'Gasto': 'R$ {:,.2f}',
+                    'Saldo': 'R$ {:,.2f}',
+                    '%_Uso': '{:.1f}%'
+                }),
                 use_container_width=True,
                 hide_index=True
             )
-        
-        with col_prog:
-            st.markdown("**📈 Progresso Real vs Orçado**")
-            
-            # Calcular gastos reais por categoria
-            gastos_por_categoria = despesas_filtradas.groupby('CATEGORIA')['VALOR'].sum().abs()
-            
-            # Criar gráfico de barras de progresso
-            fig_orcamento = go.Figure()
-            
-            for _, row in df_orcamento.iterrows():
-                categoria = row['Categoria']
-                valor_orcado = (row['Porcentagem'] / 100) * renda_liquida
-                valor_gasto = gastos_por_categoria.get(categoria, 0)
-                percentual_gasto = (valor_gasto / valor_orcado * 100) if valor_orcado > 0 else 0
-                
-                # Definir cor baseada no percentual
-                if percentual_gasto >= 100:
-                    cor = '#FF4444'  # Vermelho - ultrapassou
-                elif percentual_gasto >= 80:
-                    cor = '#FFAA00'  # Laranja - próximo do limite
-                else:
-                    cor = '#44AA44'  # Verde - dentro do limite
-                
-                # Barra de progresso
-                fig_orcamento.add_trace(go.Bar(
-                    name=categoria,
-                    x=[categoria],
-                    y=[valor_gasto],
-                    width=0.6,
-                    marker_color=cor,
-                    hovertemplate=f'<b>{categoria}</b><br>' +
-                                 f'Orçado: {format_brl(valor_orcado)}<br>' +
-                                 f'Gasto: {format_brl(valor_gasto)}<br>' +
-                                 f'Progresso: {percentual_gasto:.1f}%<br>' +
-                                 f'Restante: {format_brl(max(0, valor_orcado - valor_gasto))}<extra></extra>'
-                ))
-                
-                # Linha do limite orçado
-                fig_orcamento.add_trace(go.Scatter(
-                    name=f'{categoria} (Limite)',
-                    x=[categoria],
-                    y=[valor_orcado],
-                    mode='markers',
-                    marker=dict(symbol='diamond', size=12, color='#333333'),
-                    showlegend=False,
-                    hovertemplate=f'Limite: {format_brl(valor_orcado)}<extra></extra>'
-                ))
-            
-            fig_orcamento.update_layout(
-                title="Gastos Reais vs Orçado por Categoria",
-                xaxis_title="Categoria",
-                yaxis_title="Valor (R$)",
-                height=400,
-                showlegend=False,
-                barmode='group'
-            )
-            
-            st.plotly_chart(fig_orcamento, use_container_width=True)
-        
-        # Seção de alertas
-        st.markdown("---")
-        st.subheader("⚠️ Alertas de Orçamento")
-        
-        alertas = []
-        for _, row in df_orcamento.iterrows():
-            categoria = row['Categoria']
-            valor_orcado = (row['Porcentagem'] / 100) * renda_liquida
-            valor_gasto = gastos_por_categoria.get(categoria, 0)
-            percentual_gasto = (valor_gasto / valor_orcado * 100) if valor_orcado > 0 else 0
-            
-            if percentual_gasto >= 100:
-                alertas.append(f"🔴 **{categoria}**: Ultrapassou o orçamento em {format_brl(valor_gasto - valor_orcado)}")
-            elif percentual_gasto >= 80:
-                alertas.append(f"🟡 **{categoria}**: {percentual_gasto:.1f}% do orçamento usado ({format_brl(valor_orcado - valor_gasto)} restantes)")
-        
-        if alertas:
-            for alerta in alertas:
-                st.warning(alerta)
         else:
-            st.success("✅ Todas as categorias estão dentro do orçamento!")
-        
-        # Resumo final
-        st.markdown("---")
-        st.subheader("📊 Resumo Geral")
-        
-        total_orcado = renda_liquida
-        total_gasto = gastos_por_categoria.sum()
-        percentual_total = (total_gasto / total_orcado * 100) if total_orcado > 0 else 0
-        
-        col_res1, col_res2, col_res3 = st.columns(3)
-        with col_res1:
-            st.metric("Total Orçado", format_brl(total_orcado))
-        with col_res2:
-            st.metric("Total Gasto", format_brl(total_gasto))
-        with col_res3:
-            st.metric("Percentual Utilizado", f"{percentual_total:.1f}%")
-        
-        # Barra de progresso geral
-        st.progress(min(percentual_total / 100, 1.0))
-        if percentual_total > 100:
-            st.error(f"⚠️ Orçamento total ultrapassado em {percentual_total - 100:.1f}%")
-        elif percentual_total > 90:
-            st.warning(f"⚠️ {percentual_total:.1f}% do orçamento total utilizado")
-        else:
-            st.success(f"✅ {percentual_total:.1f}% do orçamento total utilizado")
-        
-        # Botão de exportação de relatório (movido para o final)
-        st.markdown("---")
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col2:
-            if st.button("📄 Exportar Relatório PDF", type="primary", use_container_width=True):
-                # Criar instância do gerador de relatórios
-                relatorio = RelatorioPDF()
-                
-                # Preparar dados para o relatório
-                dados_relatorio = {
-                    'renda_liquida': renda_liquida,
-                    'total_orcado': total_orcado,
-                    'total_gasto': total_gasto,
-                    'percentual_total': percentual_total,
-                    'config_orcamento': df_orc_display[['Categoria', 'Porcentagem', 'Valor Orçado']],
-                    'grafico_progresso': fig_orcamento,
-                    'alertas': alertas
-                }
-                
-                # Gerar relatório
-                try:
-                    filename = relatorio.generate_budget_report(dados_relatorio, "relatorio_orcamento.pdf")
-                    st.success("✅ Relatório gerado com sucesso!")
-                    create_download_button(filename, "📥 Download Relatório Orçamento")
-                except Exception as e:
-                    st.error(f"❌ Erro ao gerar relatório: {e}")
+            st.warning("A Renda Líquida para o período selecionado é zero ou negativa. O cálculo do orçamento não pode ser realizado.")
 
     # --- LÓGICA DOS MODAIS DE LANÇAMENTO ---
 
@@ -2178,7 +2177,15 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
 
                 c_desc, c_cli = st.columns(2)
                 descricao_venda = c_desc.text_input("Descrição da Venda", key="desc_venda")
-                cliente_venda = c_cli.text_input("Cliente", key="cliente_venda")
+                
+                # Modificação para sugestão de clientes
+                opcoes_cliente = ["Adicionar novo cliente"] + sorted(clientes)
+                cliente_selecionado = c_cli.selectbox("Cliente", opcoes_cliente, key="cliente_venda_select")
+                
+                if cliente_selecionado == "Adicionar novo cliente":
+                    cliente_final = st.text_input("Nome do Novo Cliente", key="cliente_venda_novo")
+                else:
+                    cliente_final = cliente_selecionado
 
 
                 c3, c4, c5 = st.columns(3)
@@ -2195,11 +2202,13 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
                 if submitted:
                     if not descricao_venda or valor_venda == 0:
                         st.warning("Descrição e Valor são obrigatórios.")
+                    elif not cliente_final:
+                        st.warning("O campo Cliente é obrigatório.")
                     else:
                         new_data = pd.DataFrame([{
                             'DATA': pd.to_datetime(data_venda),
                             'DESCRIÇÃO': descricao_venda,
-                            'Cliente': cliente_venda if cliente_venda else 'N/A',
+                            'Cliente': cliente_final,
                             'CONTA': conta_venda,
                             'TIPO DE RECEBIMENTO': tipo_receb_venda,
                             'VALOR': valor_venda,
@@ -2257,6 +2266,610 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
                         if save_transaction(new_data, "Div_CC"):
                             st.success("Compra salva com sucesso!")
                             st.session_state.show_cc_form = False
+                            st.rerun()
+
+    # --- FORMULÁRIOS DE EDIÇÃO ---
+    
+    # Formulário de edição de Vendas
+    if st.session_state.get("show_edit_Vendas", False):
+        st.subheader("✏️ Editar Venda")
+        with st.container():
+            # Carregar dados filtrados de vendas
+            df_vendas = pd.read_excel(xls, sheet_name='Vendas')
+            df_vendas['DATA'] = pd.to_datetime(df_vendas['DATA'], errors='coerce')
+            df_vendas = df_vendas.dropna(subset=['DATA'])
+            df_vendas['Ano'] = df_vendas['DATA'].dt.year.astype(str)
+            df_vendas['Mês'] = df_vendas['DATA'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
+            
+            # Aplicar filtros
+            vendas_filtradas = df_vendas[
+                (df_vendas['Ano'].isin(anos_selecionados) if anos_selecionados else True) &
+                (df_vendas['Mês'].isin(meses_selecionados) if meses_selecionados else True)
+            ]
+            
+            if not vendas_filtradas.empty:
+                # Carregar dados para os selects
+                df_conta = pd.read_excel(xls, sheet_name='Conta')
+                contas = df_conta['Contas'].dropna().unique().tolist()
+                tipos_recebimento = df_vendas['TIPO DE RECEBIMENTO'].dropna().unique().tolist()
+                clientes = df_vendas['Cliente'].dropna().unique().tolist()
+                
+                # Criar opções para seleção
+                opcoes_venda = [f"{row['DATA'].strftime('%d/%m/%Y')} - {row['Cliente']} - R$ {row['VALOR']:,.2f}" 
+                               for idx, row in vendas_filtradas.iterrows()]
+                
+                venda_selecionada = st.selectbox("Selecionar venda para editar:", opcoes_venda, key="edit_venda_select")
+                
+                if venda_selecionada:
+                    idx_selecionado = opcoes_venda.index(venda_selecionada)
+                    row_to_edit = vendas_filtradas.iloc[idx_selecionado]
+                    
+                    with st.form("edit_venda_form"):
+                        st.write("**Editar dados da venda:**")
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            nova_data = col1.date_input("Data", value=pd.to_datetime(row_to_edit['DATA']).date(), key="edit_data_venda")
+                            novo_cliente = col1.text_input("Cliente", value=row_to_edit['Cliente'], key="edit_cliente_venda")
+                        with col2:
+                            nova_descricao = col2.text_input("Descrição", value=row_to_edit['DESCRIÇÃO'], key="edit_descricao_venda")
+                            novo_valor = col2.number_input("Valor", value=float(row_to_edit['VALOR']), format="%.2f", key="edit_valor_venda")
+                        
+                        col3, col4, col5 = st.columns(3)
+                        with col3:
+                            nova_conta = col3.selectbox("Conta", sorted(contas), index=contas.index(row_to_edit['CONTA']) if row_to_edit['CONTA'] in contas else 0, key="edit_conta_venda")
+                        with col4:
+                            novo_tipo_receb = col4.selectbox("Tipo de Recebimento", sorted(tipos_recebimento), index=tipos_recebimento.index(row_to_edit['TIPO DE RECEBIMENTO']) if row_to_edit['TIPO DE RECEBIMENTO'] in tipos_recebimento else 0, key="edit_tipo_receb_venda")
+                        with col5:
+                            novo_status = col5.selectbox("Status", ["Sim", "Não"], index=0 if row_to_edit['Status'] == "Sim" else 1, key="edit_status_venda")
+                        
+                        col_submit, col_cancel = st.columns(2)
+                        submitted = col_submit.form_submit_button("💾 Salvar Alterações", use_container_width=True, type="primary")
+                        if col_cancel.form_submit_button("✖️ Cancelar", use_container_width=True):
+                            st.session_state.show_edit_Vendas = False
+                            st.rerun()
+                        
+                        if submitted:
+                            updated_data = {
+                                'DATA': pd.to_datetime(nova_data),
+                                'Cliente': novo_cliente,
+                                'DESCRIÇÃO': nova_descricao,
+                                'CONTA': nova_conta,
+                                'TIPO DE RECEBIMENTO': novo_tipo_receb,
+                                'VALOR': novo_valor,
+                                'Status': novo_status
+                            }
+                            
+                            # Encontra o índice original no dataframe completo
+                            original_idx = vendas_filtradas.index[idx_selecionado]
+                            success, message = crud_system.update_record("Vendas", original_idx, updated_data)
+                            
+                            if success:
+                                st.success("Venda atualizada com sucesso!")
+                                st.session_state.show_edit_Vendas = False
+                                st.rerun()
+                            else:
+                                st.error(f"Erro ao atualizar venda: {message}")
+            else:
+                st.info("Nenhuma venda encontrada com os filtros selecionados.")
+    
+    # Formulário de edição de Investimentos
+    if st.session_state.get("show_edit_Investimentos", False):
+        st.subheader("✏️ Editar Investimento")
+        with st.container():
+            # Carregar dados filtrados de investimentos
+            df_investimentos = pd.read_excel(xls, sheet_name='Investimentos')
+            df_investimentos['DATA'] = pd.to_datetime(df_investimentos['DATA'], errors='coerce')
+            df_investimentos = df_investimentos.dropna(subset=['DATA'])
+            df_investimentos['Ano'] = df_investimentos['DATA'].dt.year.astype(str)
+            df_investimentos['Mês'] = df_investimentos['DATA'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
+            
+            # Aplicar filtros
+            investimentos_filtrados = df_investimentos[
+                (df_investimentos['Ano'].isin(st.session_state.get('ano_invest', [])) if st.session_state.get('ano_invest') else True) &
+                (df_investimentos['Mês'].isin(st.session_state.get('mes_invest', [])) if st.session_state.get('mes_invest') else True) &
+                ((df_investimentos['TIPO'] == st.session_state.get('tipo_invest', 'Todos')) | (st.session_state.get('tipo_invest', 'Todos') == 'Todos')) &
+                ((df_investimentos['OBJETIVO'] == st.session_state.get('objetivo_invest', 'Todos')) | (st.session_state.get('objetivo_invest', 'Todos') == 'Todos')) &
+                ((df_investimentos['ATIVO'] == st.session_state.get('ativo_invest', 'Todos')) | (st.session_state.get('ativo_invest', 'Todos') == 'Todos'))
+            ]
+            
+            if not investimentos_filtrados.empty:
+                # Criar opções para seleção
+                opcoes_invest = [f"{row['DATA'].strftime('%d/%m/%Y')} - {row['ATIVO']} - R$ {row['VALOR_APORTE']:,.2f}" 
+                                for idx, row in investimentos_filtrados.iterrows()]
+                
+                invest_selecionado = st.selectbox("Selecionar investimento para editar:", opcoes_invest, key="edit_invest_select")
+                
+                if invest_selecionado:
+                    idx_selecionado = opcoes_invest.index(invest_selecionado)
+                    row_to_edit = investimentos_filtrados.iloc[idx_selecionado]
+                    
+                    with st.form("edit_invest_form"):
+                        st.write("**Editar dados do investimento:**")
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            nova_data = col1.date_input("Data", value=pd.to_datetime(row_to_edit['DATA']).date(), key="edit_data_invest")
+                            novo_tipo = col1.text_input("Tipo", value=row_to_edit['TIPO'], key="edit_tipo_invest")
+                        with col2:
+                            novo_ativo = col2.text_input("Ativo", value=row_to_edit['ATIVO'], key="edit_ativo_invest")
+                            novo_valor = col2.number_input("Valor Aportado", value=float(row_to_edit['VALOR_APORTE']), format="%.2f", key="edit_valor_invest")
+                        
+                        col3, col4 = st.columns(2)
+                        with col3:
+                            nova_quantidade = col3.number_input("Quantidade", value=float(row_to_edit['QUANTIDADE']) if pd.notna(row_to_edit['QUANTIDADE']) else 0.0, format="%.2f", key="edit_quantidade_invest")
+                            novo_preco_medio = col3.number_input("Preço Médio", value=float(row_to_edit['PRECO_MEDIO']) if pd.notna(row_to_edit['PRECO_MEDIO']) else 0.0, format="%.2f", key="edit_preco_medio_invest")
+                        with col4:
+                            novo_objetivo = col4.text_input("Objetivo", value=row_to_edit['OBJETIVO'], key="edit_objetivo_invest")
+                        
+                        col_submit, col_cancel = st.columns(2)
+                        submitted = col_submit.form_submit_button("💾 Salvar Alterações", use_container_width=True, type="primary")
+                        if col_cancel.form_submit_button("✖️ Cancelar", use_container_width=True):
+                            st.session_state.show_edit_Investimentos = False
+                            st.rerun()
+                        
+                        if submitted:
+                            updated_data = {
+                                'DATA': pd.to_datetime(nova_data),
+                                'TIPO': novo_tipo,
+                                'ATIVO': novo_ativo,
+                                'VALOR_APORTE': novo_valor,
+                                'QUANTIDADE': nova_quantidade,
+                                'PRECO_MEDIO': novo_preco_medio,
+                                'OBJETIVO': novo_objetivo
+                            }
+                            
+                            # Encontra o índice original no dataframe completo
+                            original_idx = investimentos_filtrados.index[idx_selecionado]
+                            success, message = crud_system.update_record("Investimentos", original_idx, updated_data)
+                            
+                            if success:
+                                st.success("Investimento atualizado com sucesso!")
+                                st.session_state.show_edit_Investimentos = False
+                                st.rerun()
+                            else:
+                                st.error(f"Erro ao atualizar investimento: {message}")
+            else:
+                st.info("Nenhum investimento encontrado com os filtros selecionados.")
+    
+    # Formulário de edição de Cartão de Crédito
+    if st.session_state.get("show_edit_Div_CC", False):
+        st.subheader("✏️ Editar Compra no Cartão")
+        with st.container():
+            # Carregar dados filtrados de cartão de crédito
+            df_cc = pd.read_excel(xls, sheet_name='Div_CC')
+            df_cc['Data'] = pd.to_datetime(df_cc['Data'], errors='coerce')
+            df_cc.dropna(subset=['Data'], inplace=True)
+            df_cc['Ano'] = df_cc['Data'].dt.year.astype(str)
+            df_cc['Mês'] = df_cc['Data'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
+            
+            # Aplicar filtros
+            cc_filtrado = df_cc[
+                (df_cc['Ano'].isin(st.session_state.ano_cc_sidebar) if st.session_state.ano_cc_sidebar else True) &
+                (df_cc['Mês'].isin(st.session_state.mes_cc_sidebar) if st.session_state.mes_cc_sidebar else True) &
+                ((df_cc['Cartão'] == st.session_state.cartao_cc_sidebar) | (st.session_state.cartao_cc_sidebar == 'Todos')) &
+                ((df_cc['Situação'] == st.session_state.situacao_cc_sidebar) | (st.session_state.situacao_cc_sidebar == 'Todas')) &
+                ((df_cc['Tipo de Compra'] == st.session_state.tipo_compra_cc_sidebar) | (st.session_state.tipo_compra_cc_sidebar == 'Todos')) &
+                ((df_cc['Quantidade de parcelas'].astype(str) == st.session_state.parcelas_cc_sidebar) | (st.session_state.parcelas_cc_sidebar == 'Todas'))
+            ]
+            
+            if not cc_filtrado.empty:
+                # Criar opções para seleção
+                opcoes_cc = [f"{row['Data'].strftime('%d/%m/%Y')} - {row['Descrição']} - R$ {row['valor total da compra']:,.2f}" 
+                            for idx, row in cc_filtrado.iterrows()]
+                
+                cc_selecionado = st.selectbox("Selecionar compra para editar:", opcoes_cc, key="edit_cc_select")
+                
+                if cc_selecionado:
+                    idx_selecionado = opcoes_cc.index(cc_selecionado)
+                    row_to_edit = cc_filtrado.iloc[idx_selecionado]
+                    
+                    with st.form("edit_cc_form"):
+                        st.write("**Editar dados da compra:**")
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            nova_data = col1.date_input("Data", value=pd.to_datetime(row_to_edit['Data']).date(), key="edit_data_cc")
+                            nova_descricao = col1.text_input("Descrição", value=row_to_edit['Descrição'], key="edit_descricao_cc")
+                        with col2:
+                            novo_tipo_compra = col2.text_input("Tipo de Compra", value=row_to_edit['Tipo de Compra'], key="edit_tipo_compra_cc")
+                            novo_cartao = col2.text_input("Cartão", value=row_to_edit['Cartão'], key="edit_cartao_cc")
+                        
+                        col3, col4 = st.columns(2)
+                        with col3:
+                            nova_qtd_parcelas = col3.number_input("Qtd. Parcelas", value=int(row_to_edit['Quantidade de parcelas']), key="edit_qtd_parcelas_cc")
+                            novo_valor_total = col3.number_input("Valor Total", value=float(row_to_edit['valor total da compra']), format="%.2f", key="edit_valor_total_cc")
+                        with col4:
+                            nova_situacao = col4.selectbox("Situação", ["Pendente", "Pago"], index=0 if row_to_edit['Situação'] == "Pendente" else 1, key="edit_situacao_cc")
+                        
+                        col_submit, col_cancel = st.columns(2)
+                        submitted = col_submit.form_submit_button("💾 Salvar Alterações", use_container_width=True, type="primary")
+                        if col_cancel.form_submit_button("✖️ Cancelar", use_container_width=True):
+                            st.session_state.show_edit_Div_CC = False
+                            st.rerun()
+                        
+                        if submitted:
+                            updated_data = {
+                                'Data': pd.to_datetime(nova_data),
+                                'Descrição': nova_descricao,
+                                'Tipo de Compra': novo_tipo_compra,
+                                'Cartão': novo_cartao,
+                                'Quantidade de parcelas': nova_qtd_parcelas,
+                                'valor total da compra': novo_valor_total,
+                                'Situação': nova_situacao
+                            }
+                            
+                            # Encontra o índice original no dataframe completo
+                            original_idx = cc_filtrado.index[idx_selecionado]
+                            success, message = crud_system.update_record("Div_CC", original_idx, updated_data)
+                            
+                            if success:
+                                st.success("Compra atualizada com sucesso!")
+                                st.session_state.show_edit_Div_CC = False
+                                st.rerun()
+                            else:
+                                st.error(f"Erro ao atualizar compra: {message}")
+            else:
+                st.info("Nenhuma compra encontrada com os filtros selecionados.")
+
+    # --- FORMULÁRIOS DE EXCLUSÃO ---
+    
+    # Formulário de exclusão de Vendas
+    if st.session_state.get("show_delete_Vendas", False):
+        st.subheader("🗑️ Excluir Venda")
+        with st.container():
+            # Carregar dados filtrados de vendas
+            df_vendas = pd.read_excel(xls, sheet_name='Vendas')
+            df_vendas['DATA'] = pd.to_datetime(df_vendas['DATA'], errors='coerce')
+            df_vendas = df_vendas.dropna(subset=['DATA'])
+            df_vendas['Ano'] = df_vendas['DATA'].dt.year.astype(str)
+            df_vendas['Mês'] = df_vendas['DATA'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
+            
+            # Aplicar filtros
+            vendas_filtradas = df_vendas[
+                (df_vendas['Ano'].isin(anos_selecionados) if anos_selecionados else True) &
+                (df_vendas['Mês'].isin(meses_selecionados) if meses_selecionados else True)
+            ]
+            
+            if not vendas_filtradas.empty:
+                # Criar opções para seleção
+                opcoes_venda = [f"{row['DATA'].strftime('%d/%m/%Y')} - {row['Cliente']} - R$ {row['VALOR']:,.2f}" 
+                               for idx, row in vendas_filtradas.iterrows()]
+                
+                venda_selecionada = st.selectbox("Selecionar venda para excluir:", opcoes_venda, key="delete_venda_select")
+                
+                if st.button("🗑️ Confirmar Exclusão", key="confirm_delete_venda"):
+                    if venda_selecionada:
+                        idx_selecionado = opcoes_venda.index(venda_selecionada)
+                        original_idx = vendas_filtradas.index[idx_selecionado]
+                        success, message = crud_system.delete_record("Vendas", original_idx)
+                        
+                        if success:
+                            st.success("Venda excluída com sucesso!")
+                            st.session_state.show_delete_Vendas = False
+                            st.rerun()
+                        else:
+                            st.error(f"Erro ao excluir venda: {message}")
+            else:
+                st.info("Nenhuma venda encontrada com os filtros selecionados.")
+    
+    # Formulário de exclusão de Investimentos
+    if st.session_state.get("show_delete_Investimentos", False):
+        st.subheader("🗑️ Excluir Investimento")
+        with st.container():
+            # Carregar dados filtrados de investimentos
+            df_investimentos = pd.read_excel(xls, sheet_name='Investimentos')
+            df_investimentos['DATA'] = pd.to_datetime(df_investimentos['DATA'], errors='coerce')
+            df_investimentos = df_investimentos.dropna(subset=['DATA'])
+            df_investimentos['Ano'] = df_investimentos['DATA'].dt.year.astype(str)
+            df_investimentos['Mês'] = df_investimentos['DATA'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
+            
+            # Aplicar filtros
+            investimentos_filtrados = df_investimentos[
+                (df_investimentos['Ano'].isin(st.session_state.get('ano_invest', [])) if st.session_state.get('ano_invest') else True) &
+                (df_investimentos['Mês'].isin(st.session_state.get('mes_invest', [])) if st.session_state.get('mes_invest') else True) &
+                ((df_investimentos['TIPO'] == st.session_state.get('tipo_invest', 'Todos')) | (st.session_state.get('tipo_invest', 'Todos') == 'Todos')) &
+                ((df_investimentos['OBJETIVO'] == st.session_state.get('objetivo_invest', 'Todos')) | (st.session_state.get('objetivo_invest', 'Todos') == 'Todos')) &
+                ((df_investimentos['ATIVO'] == st.session_state.get('ativo_invest', 'Todos')) | (st.session_state.get('ativo_invest', 'Todos') == 'Todos'))
+            ]
+            
+            if not investimentos_filtrados.empty:
+                # Criar opções para seleção
+                opcoes_invest = [f"{row['DATA'].strftime('%d/%m/%Y')} - {row['ATIVO']} - R$ {row['VALOR_APORTE']:,.2f}" 
+                                for idx, row in investimentos_filtrados.iterrows()]
+                
+                invest_selecionado = st.selectbox("Selecionar investimento para excluir:", opcoes_invest, key="delete_invest_select")
+                
+                if st.button("🗑️ Confirmar Exclusão", key="confirm_delete_invest"):
+                    if invest_selecionado:
+                        idx_selecionado = opcoes_invest.index(invest_selecionado)
+                        original_idx = investimentos_filtrados.index[idx_selecionado]
+                        success, message = crud_system.delete_record("Investimentos", original_idx)
+                        
+                        if success:
+                            st.success("Investimento excluído com sucesso!")
+                            st.session_state.show_delete_Investimentos = False
+                            st.rerun()
+                        else:
+                            st.error(f"Erro ao excluir investimento: {message}")
+            else:
+                st.info("Nenhum investimento encontrado com os filtros selecionados.")
+    
+    # Formulário de exclusão de Cartão de Crédito
+    if st.session_state.get("show_delete_Div_CC", False):
+        st.subheader("🗑️ Excluir Compra no Cartão")
+        with st.container():
+            # Carregar dados filtrados de cartão de crédito
+            df_cc = pd.read_excel(xls, sheet_name='Div_CC')
+            df_cc['Data'] = pd.to_datetime(df_cc['Data'], errors='coerce')
+            df_cc.dropna(subset=['Data'], inplace=True)
+            df_cc['Ano'] = df_cc['Data'].dt.year.astype(str)
+            df_cc['Mês'] = df_cc['Data'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
+            
+            # Aplicar filtros
+            cc_filtrado = df_cc[
+                (df_cc['Ano'].isin(st.session_state.ano_cc_sidebar) if st.session_state.ano_cc_sidebar else True) &
+                (df_cc['Mês'].isin(st.session_state.mes_cc_sidebar) if st.session_state.mes_cc_sidebar else True) &
+                ((df_cc['Cartão'] == st.session_state.cartao_cc_sidebar) | (st.session_state.cartao_cc_sidebar == 'Todos')) &
+                ((df_cc['Situação'] == st.session_state.situacao_cc_sidebar) | (st.session_state.situacao_cc_sidebar == 'Todas')) &
+                ((df_cc['Tipo de Compra'] == st.session_state.tipo_compra_cc_sidebar) | (st.session_state.tipo_compra_cc_sidebar == 'Todos')) &
+                ((df_cc['Quantidade de parcelas'].astype(str) == st.session_state.parcelas_cc_sidebar) | (st.session_state.parcelas_cc_sidebar == 'Todas'))
+            ]
+            
+            if not cc_filtrado.empty:
+                # Criar opções para seleção
+                opcoes_cc = [f"{row['Data'].strftime('%d/%m/%Y')} - {row['Descrição']} - R$ {row['valor total da compra']:,.2f}" 
+                            for idx, row in cc_filtrado.iterrows()]
+                
+                cc_selecionado = st.selectbox("Selecionar compra para excluir:", opcoes_cc, key="delete_cc_select")
+                
+                if st.button("🗑️ Confirmar Exclusão", key="confirm_delete_cc"):
+                    if cc_selecionado:
+                        idx_selecionado = opcoes_cc.index(cc_selecionado)
+                        original_idx = cc_filtrado.index[idx_selecionado]
+                        success, message = crud_system.delete_record("Div_CC", original_idx)
+                        
+                        if success:
+                            st.success("Compra excluída com sucesso!")
+                            st.session_state.show_delete_Div_CC = False
+                            st.rerun()
+                        else:
+                            st.error(f"Erro ao excluir compra: {message}")
+            else:
+                st.info("Nenhuma compra encontrada com os filtros selecionados.")
+
+    # --- FORMULÁRIOS DE EXCLUSÃO EM LOTE ---
+    
+    # Formulário de exclusão em lote de Vendas
+    if st.session_state.get("show_bulk_delete_Vendas", False):
+        st.subheader("🗑️ Exclusão em Lote - Vendas")
+        with st.container():
+            # Carregar dados filtrados de vendas
+            df_vendas = pd.read_excel(xls, sheet_name='Vendas')
+            df_vendas['DATA'] = pd.to_datetime(df_vendas['DATA'], errors='coerce')
+            df_vendas = df_vendas.dropna(subset=['DATA'])
+            df_vendas['Ano'] = df_vendas['DATA'].dt.year.astype(str)
+            df_vendas['Mês'] = df_vendas['DATA'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
+            
+            # Aplicar filtros
+            vendas_filtradas = df_vendas[
+                (df_vendas['Ano'].isin(anos_selecionados) if anos_selecionados else True) &
+                (df_vendas['Mês'].isin(meses_selecionados) if meses_selecionados else True)
+            ]
+            
+            if not vendas_filtradas.empty:
+                # Criar opções para seleção múltipla
+                opcoes_venda = [f"{row['DATA'].strftime('%d/%m/%Y')} - {row['Cliente']} - R$ {row['VALOR']:,.2f}" 
+                               for idx, row in vendas_filtradas.iterrows()]
+                
+                vendas_selecionadas = st.multiselect("Selecionar vendas para excluir:", opcoes_venda, key="bulk_delete_venda_select")
+                
+                if vendas_selecionadas:
+                    st.warning(f"⚠️ Você está prestes a excluir {len(vendas_selecionadas)} venda(s). Esta ação não pode ser desfeita!")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("🗑️ Confirmar Exclusão em Lote", key="confirm_bulk_delete_venda", type="primary"):
+                            success_count = 0
+                            error_count = 0
+                            
+                            for venda_selecionada in vendas_selecionadas:
+                                idx_selecionado = opcoes_venda.index(venda_selecionada)
+                                original_idx = vendas_filtradas.index[idx_selecionado]
+                                success, message = crud_system.delete_record("Vendas", original_idx)
+                                
+                                if success:
+                                    success_count += 1
+                                else:
+                                    error_count += 1
+                            
+                            if success_count > 0:
+                                st.success(f"✅ {success_count} venda(s) excluída(s) com sucesso!")
+                            if error_count > 0:
+                                st.error(f"❌ {error_count} venda(s) não puderam ser excluída(s).")
+                            
+                            st.session_state.show_bulk_delete_Vendas = False
+                            st.rerun()
+                    
+                    with col2:
+                        if st.button("✖️ Cancelar", key="cancel_bulk_delete_venda"):
+                            st.session_state.show_bulk_delete_Vendas = False
+                            st.rerun()
+            else:
+                st.info("Nenhuma venda encontrada com os filtros selecionados.")
+    
+    # Formulário de exclusão em lote de Investimentos
+    if st.session_state.get("show_bulk_delete_Investimentos", False):
+        st.subheader("🗑️ Exclusão em Lote - Investimentos")
+        with st.container():
+            # Carregar dados filtrados de investimentos
+            df_investimentos = pd.read_excel(xls, sheet_name='Investimentos')
+            df_investimentos['DATA'] = pd.to_datetime(df_investimentos['DATA'], errors='coerce')
+            df_investimentos = df_investimentos.dropna(subset=['DATA'])
+            df_investimentos['Ano'] = df_investimentos['DATA'].dt.year.astype(str)
+            df_investimentos['Mês'] = df_investimentos['DATA'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
+            
+            # Aplicar filtros
+            investimentos_filtrados = df_investimentos[
+                (df_investimentos['Ano'].isin(st.session_state.get('ano_invest', [])) if st.session_state.get('ano_invest') else True) &
+                (df_investimentos['Mês'].isin(st.session_state.get('mes_invest', [])) if st.session_state.get('mes_invest') else True) &
+                ((df_investimentos['TIPO'] == st.session_state.get('tipo_invest', 'Todos')) | (st.session_state.get('tipo_invest', 'Todos') == 'Todos')) &
+                ((df_investimentos['OBJETIVO'] == st.session_state.get('objetivo_invest', 'Todos')) | (st.session_state.get('objetivo_invest', 'Todos') == 'Todos')) &
+                ((df_investimentos['ATIVO'] == st.session_state.get('ativo_invest', 'Todos')) | (st.session_state.get('ativo_invest', 'Todos') == 'Todos'))
+            ]
+            
+            if not investimentos_filtrados.empty:
+                # Criar opções para seleção múltipla
+                opcoes_invest = [f"{row['DATA'].strftime('%d/%m/%Y')} - {row['ATIVO']} - R$ {row['VALOR_APORTE']:,.2f}" 
+                                for idx, row in investimentos_filtrados.iterrows()]
+                
+                investimentos_selecionados = st.multiselect("Selecionar investimentos para excluir:", opcoes_invest, key="bulk_delete_invest_select")
+                
+                if investimentos_selecionados:
+                    st.warning(f"⚠️ Você está prestes a excluir {len(investimentos_selecionados)} investimento(s). Esta ação não pode ser desfeita!")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("🗑️ Confirmar Exclusão em Lote", key="confirm_bulk_delete_invest", type="primary"):
+                            success_count = 0
+                            error_count = 0
+                            
+                            for invest_selecionado in investimentos_selecionados:
+                                idx_selecionado = opcoes_invest.index(invest_selecionado)
+                                original_idx = investimentos_filtrados.index[idx_selecionado]
+                                success, message = crud_system.delete_record("Investimentos", original_idx)
+                                
+                                if success:
+                                    success_count += 1
+                                else:
+                                    error_count += 1
+                            
+                            if success_count > 0:
+                                st.success(f"✅ {success_count} investimento(s) excluído(s) com sucesso!")
+                            if error_count > 0:
+                                st.error(f"❌ {error_count} investimento(s) não puderam ser excluído(s).")
+                            
+                            st.session_state.show_bulk_delete_Investimentos = False
+                            st.rerun()
+                    
+                    with col2:
+                        if st.button("✖️ Cancelar", key="cancel_bulk_delete_invest"):
+                            st.session_state.show_bulk_delete_Investimentos = False
+                            st.rerun()
+            else:
+                st.info("Nenhum investimento encontrado com os filtros selecionados.")
+    
+    # Formulário de exclusão em lote de Cartão de Crédito
+    if st.session_state.get("show_bulk_delete_Div_CC", False):
+        st.subheader("🗑️ Exclusão em Lote - Compras no Cartão")
+        with st.container():
+            # Carregar dados filtrados de cartão de crédito
+            df_cc = pd.read_excel(xls, sheet_name='Div_CC')
+            df_cc['Data'] = pd.to_datetime(df_cc['Data'], errors='coerce')
+            df_cc.dropna(subset=['Data'], inplace=True)
+            df_cc['Ano'] = df_cc['Data'].dt.year.astype(str)
+            df_cc['Mês'] = df_cc['Data'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
+            
+            # Aplicar filtros
+            cc_filtrado = df_cc[
+                (df_cc['Ano'].isin(st.session_state.ano_cc_sidebar) if st.session_state.ano_cc_sidebar else True) &
+                (df_cc['Mês'].isin(st.session_state.mes_cc_sidebar) if st.session_state.mes_cc_sidebar else True) &
+                ((df_cc['Cartão'] == st.session_state.cartao_cc_sidebar) | (st.session_state.cartao_cc_sidebar == 'Todos')) &
+                ((df_cc['Situação'] == st.session_state.situacao_cc_sidebar) | (st.session_state.situacao_cc_sidebar == 'Todas')) &
+                ((df_cc['Tipo de Compra'] == st.session_state.tipo_compra_cc_sidebar) | (st.session_state.tipo_compra_cc_sidebar == 'Todos')) &
+                ((df_cc['Quantidade de parcelas'].astype(str) == st.session_state.parcelas_cc_sidebar) | (st.session_state.parcelas_cc_sidebar == 'Todas'))
+            ]
+            
+            if not cc_filtrado.empty:
+                # Criar opções para seleção múltipla
+                opcoes_cc = [f"{row['Data'].strftime('%d/%m/%Y')} - {row['Descrição']} - R$ {row['valor total da compra']:,.2f}" 
+                            for idx, row in cc_filtrado.iterrows()]
+                
+                compras_selecionadas = st.multiselect("Selecionar compras para excluir:", opcoes_cc, key="bulk_delete_cc_select")
+                
+                if compras_selecionadas:
+                    st.warning(f"⚠️ Você está prestes a excluir {len(compras_selecionadas)} compra(s). Esta ação não pode ser desfeita!")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("🗑️ Confirmar Exclusão em Lote", key="confirm_bulk_delete_cc", type="primary"):
+                            success_count = 0
+                            error_count = 0
+                            
+                            for compra_selecionada in compras_selecionadas:
+                                idx_selecionado = opcoes_cc.index(compra_selecionada)
+                                original_idx = cc_filtrado.index[idx_selecionado]
+                                success, message = crud_system.delete_record("Div_CC", original_idx)
+                                
+                                if success:
+                                    success_count += 1
+                                else:
+                                    error_count += 1
+                            
+                            if success_count > 0:
+                                st.success(f"✅ {success_count} compra(s) excluída(s) com sucesso!")
+                            if error_count > 0:
+                                st.error(f"❌ {error_count} compra(s) não puderam ser excluída(s).")
+                            
+                            st.session_state.show_bulk_delete_Div_CC = False
+                            st.rerun()
+                    
+                    with col2:
+                        if st.button("✖️ Cancelar", key="cancel_bulk_delete_cc"):
+                            st.session_state.show_bulk_delete_Div_CC = False
+                            st.rerun()
+            else:
+                st.info("Nenhuma compra encontrada com os filtros selecionados.")
+
+    # Modal para Novo Investimento
+    if st.session_state.get("show_investimento_form", False):
+        st.subheader("💰 Lançar Novo Investimento")
+        with st.container():
+            with st.form("investimento_form", clear_on_submit=True):
+                st.subheader("Preencha os dados do investimento:")
+                
+                # Carregar dados existentes para sugestões
+                df_investimentos_base = pd.read_excel(xls, sheet_name='Investimentos')
+                tipos_investimento = df_investimentos_base['TIPO'].dropna().unique().tolist()
+                ativos = df_investimentos_base['ATIVO'].dropna().unique().tolist()
+                objetivos = df_investimentos_base['OBJETIVO'].dropna().unique().tolist()
+
+                c1, c2 = st.columns(2)
+                data_investimento = c1.date_input("Data do Investimento", datetime.now(), key="data_investimento")
+                tipo_investimento = c2.selectbox("Tipo de Investimento", sorted(tipos_investimento), key="tipo_investimento")
+                
+                c3, c4 = st.columns(2)
+                ativo = c3.text_input("Ativo", key="ativo_investimento")
+                valor_aporte = c4.number_input("Valor Aportado", min_value=0.0, value=0.0, format="%.2f", key="valor_aporte")
+                
+                c5, c6 = st.columns(2)
+                quantidade = c5.number_input("Quantidade", min_value=0.0, value=0.0, format="%.2f", key="quantidade_investimento")
+                preco_medio = c6.number_input("Preço Médio", min_value=0.0, value=0.0, format="%.2f", key="preco_medio_investimento")
+                
+                objetivo = st.selectbox("Objetivo", sorted(objetivos), key="objetivo_investimento")
+
+                col_submit, col_cancel = st.columns(2)
+                submitted = col_submit.form_submit_button("✔️ Salvar Investimento", use_container_width=True, type="primary")
+                if col_cancel.form_submit_button("✖️ Cancelar", use_container_width=True):
+                    st.session_state.show_investimento_form = False
+                    st.rerun()
+                
+                if submitted:
+                    if not ativo or valor_aporte == 0:
+                        st.warning("Ativo e Valor Aportado são obrigatórios.")
+                    else:
+                        new_data = pd.DataFrame([{
+                            'DATA': pd.to_datetime(data_investimento),
+                            'TIPO': tipo_investimento,
+                            'ATIVO': ativo,
+                            'VALOR_APORTE': valor_aporte,
+                            'QUANTIDADE': quantidade,
+                            'PRECO_MEDIO': preco_medio,
+                            'OBJETIVO': objetivo
+                        }])
+                        if save_transaction(new_data, "Investimentos"):
+                            st.success("Investimento salvo com sucesso!")
+                            st.session_state.show_investimento_form = False
                             st.rerun()
 
 except Exception as e:

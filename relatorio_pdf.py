@@ -224,6 +224,67 @@ class RelatorioPDF:
         doc.build(elements)
         return filename
     
+    def gerar_pdf_compras(self, df_compras, total_gasto, proxima_fatura, media_mensal):
+        """Gera um relatório em PDF para a tabela de compras do cartão de crédito."""
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=inch/2, leftMargin=inch/2, topMargin=inch/2, bottomMargin=inch/2)
+        elements = []
+
+        # Estilos
+        styles = getSampleStyleSheet()
+        title_style = styles['h1']
+        title_style.alignment = TA_CENTER
+        header_style = ParagraphStyle(name='Header', fontSize=8, alignment=TA_CENTER)
+
+        # Cabeçalho
+        elements.append(Paragraph("Relatório de Compras - Cartão de Crédito", title_style))
+        elements.append(Spacer(1, 0.2*inch))
+        elements.append(Paragraph(f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", header_style))
+        elements.append(Spacer(1, 0.3*inch))
+
+        # Métricas
+        kpis_data = [
+            ["Total Gasto (Filtrado):", self.format_currency(total_gasto)],
+            ["Próxima Fatura (Pendente):", self.format_currency(proxima_fatura)],
+            ["Média Mensal (Filtrado):", self.format_currency(media_mensal)]
+        ]
+        kpi_table = Table(kpis_data, colWidths=[2.5*inch, 1.5*inch])
+        kpi_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        elements.append(kpi_table)
+        elements.append(Spacer(1, 0.3*inch))
+
+        # Tabela de Compras
+        elements.append(Paragraph("Detalhes das Compras", styles['h2']))
+        elements.append(Spacer(1, 0.2*inch))
+        
+        # Prepara os dados para a tabela - converte tudo para string para evitar erros
+        data = [df_compras.columns.values.tolist()] + df_compras.astype(str).values.tolist()
+        
+        # Ajusta a largura das colunas
+        col_widths = [1*inch, 2.5*inch, 1*inch, 1*inch, 1.2*inch, 1.2*inch, 0.8*inch, 0.8*inch]
+
+        table = Table(data, colWidths=col_widths)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(table)
+        
+        doc.build(elements)
+        buffer.seek(0)
+        return buffer
+
     def generate_credit_card_report(self, data, filename="relatorio_cartao_credito.pdf"):
         """Gera relatório específico do cartão de crédito"""
         doc = SimpleDocTemplate(filename, pagesize=A4)

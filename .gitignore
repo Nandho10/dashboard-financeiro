@@ -36,4 +36,10 @@ ENV/
 
 # Sistema operacional
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Exclusions
+backups/
+E7532100
+*.pyc
+.env 
