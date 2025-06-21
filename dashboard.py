@@ -1351,7 +1351,7 @@ if selected == "Investimentos":
     with col_prog2:
         if falta_para_meta > 0:
             st.metric("Falta", format_brl(falta_para_meta), delta="Para meta")
-    else:
+        else:
             st.metric("Meta Atingida! 🎉", format_brl(0), delta="Parabéns!")
     
     # Gráficos de análise
@@ -2000,29 +2000,27 @@ if st.session_state.get("show_despesa_form", False):
             
             # Campo de descrição com validação
             st.write("**Descrição**")
-            col_desc1, col_desc2 = st.columns([3, 1])
             
-            with col_desc1:
-                # Permitir seleção de item existente ou digitação livre
-                opcao_descricao = st.selectbox(
-                    "Selecione um item da categoria ou digite livremente:",
-                    ["Digite livremente"] + sorted(itens_categoria),
-                    key="opcao_desc_despesa"
-                )
-                
-                if opcao_descricao == "Digite livremente":
-                    descricao_despesa = st.text_input("Digite a descrição:", key="desc_despesa_livre")
-                else:
-                    descricao_despesa = opcao_descricao
-                    st.success(f"✅ Item selecionado: {descricao_despesa}")
+            # Permitir seleção de item existente ou digitação livre
+            opcao_descricao = st.selectbox(
+                "Selecione um item da categoria ou digite livremente:",
+                ["Digite livremente"] + sorted(itens_categoria),
+                key="opcao_desc_despesa"
+            )
             
-            with col_desc2:
-                if itens_categoria:
-                    st.write("**Itens disponíveis:**")
-                    for item in sorted(itens_categoria):
-                        st.write(f"• {item}")
+            if opcao_descricao == "Digite livremente":
+                descricao_despesa = st.text_input("Digite a descrição:", key="desc_despesa_livre")
+            else:
+                descricao_despesa = opcao_descricao
+                st.success(f"✅ Item selecionado: {descricao_despesa}")
             
-            favorecido_despesa = st.text_input("Favorecido (opcional)", key="fav_despesa")
+            # Campos FAVORECIDO e PAGO
+            c5, c6 = st.columns(2)
+            favorecido_despesa = c5.text_input("Favorecido", key="fav_despesa")
+            pago_despesa = c6.selectbox("Status do Pagamento", ["Pago", "Pendente"], key="pago_despesa")
+            
+            # Converter para valor numérico (1 = Pago, 0 = Pendente)
+            pago_valor = 1.0 if pago_despesa == "Pago" else 0.0
 
             col_submit, col_cancel = st.columns(2)
             submitted = col_submit.form_submit_button("✔️ Salvar Despesa", use_container_width=True, type="primary")
@@ -2037,9 +2035,14 @@ if st.session_state.get("show_despesa_form", False):
                     st.warning("O valor da despesa deve ser negativo.")
                 else:
                     new_data = pd.DataFrame([{
-                        'DATA': pd.to_datetime(data_despesa), 'FAVORECIDO': favorecido_despesa if favorecido_despesa else 'N/A',
-                        'DESCRIÇÃO': descricao_despesa, 'CATEGORIA': categoria_despesa, 'CONTA': conta_despesa,
-                        'FORMA DE PAGAMENTO': 'N/A', 'VALOR': valor_despesa
+                        'DATA': pd.to_datetime(data_despesa), 
+                        'FAVORECIDO': favorecido_despesa if favorecido_despesa else 'N/A',
+                        'DESCRIÇÃO': descricao_despesa, 
+                        'CATEGORIA': categoria_despesa, 
+                        'CONTA': conta_despesa,
+                        'FORMA DE PAGAMENTO': 'N/A', 
+                        'VALOR': valor_despesa,
+                        'PAGO': pago_valor
                     }])
                     if save_transaction(new_data, "Despesas"):
                         st.success("Despesa salva com sucesso!")
@@ -2069,27 +2072,19 @@ if st.session_state.get("show_receita_form", False):
             _, itens_receitas = carregar_itens_categoria()
             
             st.write("**Descrição**")
-            col_desc1, col_desc2 = st.columns([3, 1])
             
-            with col_desc1:
-                # Permitir seleção de item existente ou digitação livre
-                opcao_descricao_rec = st.selectbox(
-                    "Selecione um item da categoria ou digite livremente:",
-                    ["Digite livremente"] + sorted(itens_receitas),
-                    key="opcao_desc_receita"
-                )
-                
-                if opcao_descricao_rec == "Digite livremente":
-                    descricao_receita = st.text_input("Digite a descrição:", key="desc_receita_livre")
-                else:
-                    descricao_receita = opcao_descricao_rec
-                    st.success(f"✅ Item selecionado: {descricao_receita}")
+            # Permitir seleção de item existente ou digitação livre
+            opcao_descricao_rec = st.selectbox(
+                "Selecione um item da categoria ou digite livremente:",
+                ["Digite livremente"] + sorted(itens_receitas),
+                key="opcao_desc_receita"
+            )
             
-            with col_desc2:
-                if itens_receitas:
-                    st.write("**Itens disponíveis:**")
-                    for item in sorted(itens_receitas):
-                        st.write(f"• {item}")
+            if opcao_descricao_rec == "Digite livremente":
+                descricao_receita = st.text_input("Digite a descrição:", key="desc_receita_livre")
+            else:
+                descricao_receita = opcao_descricao_rec
+                st.success(f"✅ Item selecionado: {descricao_receita}")
             
             col_submit, col_cancel = st.columns(2)
             submitted = col_submit.form_submit_button("✔️ Salvar Receita", use_container_width=True, type="primary")
