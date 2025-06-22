@@ -166,5 +166,42 @@ class ChartsManager:
         
         return fig
 
+    def create_top_products_chart(self, data, x_col, y_col, title, height=400):
+        """Cria um gráfico de barras horizontais para Top 5 Produtos/Serviços."""
+        if data.empty:
+            return go.Figure().add_annotation(text="Sem dados para exibir", x=0.5, y=0.5, showarrow=False)
+        
+        fig = px.bar(
+            data, 
+            x=x_col, 
+            y=y_col,
+            title=f"<b>{title}</b>",
+            height=height,
+            orientation='h',
+            text=x_col, # Adiciona o valor como texto na barra
+            color=y_col,
+            color_discrete_sequence=px.colors.qualitative.Pastel
+        )
+        
+        fig.update_layout(
+            title=dict(x=0.5, xanchor='center', font=dict(size=22, family='Arial Black')),
+            xaxis_title="",
+            yaxis_title="",
+            showlegend=False,
+            yaxis={'categoryorder':'total ascending'}, # Garante que o maior valor fique no topo
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            margin=dict(t=60, b=20, l=10, r=40),
+        )
+        
+        # Formata o texto para ser exibido como moeda
+        fig.update_traces(
+            texttemplate='R$ %{text:,.2f}', 
+            textposition='inside',
+            insidetextanchor='middle'
+        )
+
+        return fig
+
 # Instância global
 charts_manager = ChartsManager() 
