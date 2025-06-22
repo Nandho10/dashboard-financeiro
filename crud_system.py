@@ -147,40 +147,17 @@ def format_dataframe_for_display(df, sheet_name):
     return df_display
 
 def create_editable_table(df, sheet_name, crud_system):
-    """Cria uma tabela editável com botões de ação"""
+    """Cria uma tabela editável (sem botões de ação)"""
     if df.empty:
         st.info(f"Nenhum dado encontrado na aba {sheet_name}")
         return
     
-    # Adiciona colunas de ação
-    df_with_actions = df.copy()
-    df_with_actions['Ações'] = ''
+    # Adiciona colunas de ação vazia para alinhamento, se necessário.
+    # Pode ser removido se não houver mais botões na linha.
+    # df['Ações'] = ''
     
-    # Exibe a tabela
     st.dataframe(
-        df_with_actions,
+        df,
         use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Ações": st.column_config.Column(
-                "Ações",
-                width="medium",
-                help="Clique nos botões para editar ou excluir"
-            )
-        }
-    )
-    
-    # Botões de ação abaixo da tabela
-    col1, col2, col3 = st.columns([1, 1, 2])
-    
-    with col1:
-        if st.button("✏️ Editar Registro", key=f"edit_{sheet_name}"):
-            st.session_state[f"show_edit_{sheet_name}"] = True
-    
-    with col2:
-        if st.button("🗑️ Excluir Registro", key=f"delete_{sheet_name}"):
-            st.session_state[f"show_delete_{sheet_name}"] = True
-    
-    with col3:
-        if st.button("🗑️ Exclusão em Lote", key=f"bulk_delete_{sheet_name}"):
-            st.session_state[f"show_bulk_delete_{sheet_name}"] = True 
+        hide_index=True
+    ) 

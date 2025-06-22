@@ -26,6 +26,8 @@ st.set_page_config(
     layout="wide",
 )
 
+st.sidebar.info(f"DEBUG: Arquivo dashboard.py executado em: {datetime.now().strftime('%H:%M:%S')}")
+
 try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
 
     # --- FUNÇÃO PARA VERIFICAR E ADICIONAR COLUNA ---
@@ -240,11 +242,11 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
         st.header("Filtros")
         
         # Carregar anos de todas as fontes de dados, garantindo a conversão para datetime
-        df_r = pd.read_excel(xls, sheet_name='Receitas')
-        df_d = pd.read_excel(xls, sheet_name='Despesas')
-        df_i = pd.read_excel(xls, sheet_name='Investimentos')
-        df_c = pd.read_excel(xls, sheet_name='Div_CC')
-        df_v = pd.read_excel(xls, sheet_name='Vendas')
+        df_r = pd.read_excel(xls, sheet_name='Receitas', decimal=',')
+        df_d = pd.read_excel(xls, sheet_name='Despesas', decimal=',')
+        df_i = pd.read_excel(xls, sheet_name='Investimentos', decimal=',')
+        df_c = pd.read_excel(xls, sheet_name='Div_CC', decimal=',')
+        df_v = pd.read_excel(xls, sheet_name='Vendas', decimal=',')
 
         anos_r = pd.to_datetime(df_r['DATA'], errors='coerce').dt.year
         anos_d = pd.to_datetime(df_d['DATA'], errors='coerce').dt.year
@@ -312,7 +314,7 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
         # Filtros específicos por aba (movidos para dentro do sidebar)
         # Só mostra o expander de investimentos se a aba Investimentos estiver selecionada
         if selected == 'Investimentos':
-            df_investimentos = pd.read_excel(xls, sheet_name='Investimentos')
+            df_investimentos = pd.read_excel(xls, sheet_name='Investimentos', decimal=',')
             df_investimentos['DATA'] = pd.to_datetime(df_investimentos['DATA'], errors='coerce')
             df_investimentos = df_investimentos.dropna(subset=['DATA'])
             df_investimentos['Ano'] = df_investimentos['DATA'].dt.year.astype(str)
@@ -332,7 +334,7 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
         
         # Só mostra o expander de Cartão de Crédito se a aba estiver selecionada
         if selected == 'Cartão de Crédito':
-            df_cc = pd.read_excel(xls, sheet_name='Div_CC')
+            df_cc = pd.read_excel(xls, sheet_name='Div_CC', decimal=',')
             df_cc['Data'] = pd.to_datetime(df_cc['Data'], errors='coerce')
             df_cc.dropna(subset=['Data'], inplace=True)
             df_cc['Ano'] = df_cc['Data'].dt.year.astype(str)
@@ -400,7 +402,7 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
     # --- CÁLCULO DOS INDICADORES BÁSICOS ---
 
     # Filtra receitas
-    receitas = pd.read_excel(xls, sheet_name='Receitas')
+    receitas = pd.read_excel(xls, sheet_name='Receitas', decimal=',')
     receitas['DATA'] = pd.to_datetime(receitas['DATA'], errors='coerce')
     receitas = receitas.dropna(subset=['DATA'])
     receitas['Ano'] = receitas['DATA'].dt.year.astype(str)
@@ -418,7 +420,7 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
 
     # Filtra despesas
 
-    despesas = pd.read_excel(xls, sheet_name='Despesas')
+    despesas = pd.read_excel(xls, sheet_name='Despesas', decimal=',')
     despesas['DATA'] = pd.to_datetime(despesas['DATA'], errors='coerce')
     despesas = despesas.dropna(subset=['DATA'])
     despesas['Ano'] = despesas['DATA'].dt.year.astype(str)
@@ -1423,17 +1425,16 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
         st.markdown('## 📈 Análise de Vendas')
         
         try:
-            df_vendas = pd.read_excel(xls, sheet_name='Vendas')
+            df_vendas = pd.read_excel(xls, sheet_name='Vendas', decimal=',')
             df_vendas['DATA'] = pd.to_datetime(df_vendas['DATA'], errors='coerce')
-            df_vendas.dropna(subset=['DATA'], inplace=True)
+            df_vendas = df_vendas.dropna(subset=['DATA'])
+            df_vendas['Ano'] = df_vendas['DATA'].dt.year.astype(str)
+            df_vendas['Mês'] = df_vendas['DATA'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
             
             # DEBUG Adicional para ver o que foi removido
             if len(df_vendas) == 0 and 'DATA' in df_vendas.columns:
                  st.warning("Nenhuma venda encontrada com data válida. Verifique a coluna 'DATA' na sua planilha 'Vendas'.")
 
-            df_vendas['Ano'] = df_vendas['DATA'].dt.year.astype(str)
-            df_vendas['Mês'] = df_vendas['DATA'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
-            
             vendas_filtradas = df_vendas[
                 (df_vendas['Ano'].isin(anos_selecionados) if anos_selecionados else True) &
                 (df_vendas['Mês'].isin(meses_selecionados) if meses_selecionados else True) &
@@ -1562,8 +1563,8 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
         st.markdown('## 💰 Análise de Investimentos')
         
         # Carrega dados de investimentos e metas
-        df_investimentos = pd.read_excel(xls, sheet_name='Investimentos')
-        df_metas = pd.read_excel(xls, sheet_name='Metas')
+        df_investimentos = pd.read_excel(xls, sheet_name='Investimentos', decimal=',')
+        df_metas = pd.read_excel(xls, sheet_name='Metas', decimal=',')
         
         # Processa dados de investimentos
         df_investimentos['DATA'] = pd.to_datetime(df_investimentos['DATA'], errors='coerce')
@@ -1767,48 +1768,37 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
 
         # Carregar e processar dados de CC
         try:
-            df_cc = pd.read_excel(xls, sheet_name='Div_CC')
+            df_cc = pd.read_excel(xls, sheet_name='Div_CC', decimal=',')
             if not df_cc.empty:
                 df_cc['Data'] = pd.to_datetime(df_cc['Data'], errors='coerce')
                 df_cc.dropna(subset=['Data'], inplace=True)
                 df_cc['Ano'] = df_cc['Data'].dt.year.astype(str)
                 df_cc['Mês'] = df_cc['Data'].dt.strftime('%b').str.capitalize().replace({'Feb': 'Fev', 'Apr': 'Abr', 'May': 'Mai', 'Aug': 'Ago', 'Sep': 'Set', 'Oct': 'Out', 'Dec': 'Dez'})
 
-                # Exibe os filtros na sidebar
-                st.sidebar.header("Filtros Cartão de Crédito")
-                
-                anos_disponiveis = sorted(df_cc['Ano'].unique())
-                anos_selecionados_cc = st.sidebar.multiselect('Ano', anos_disponiveis, default=anos_disponiveis, key='cc_ano_multiselect')
-                
-                meses_disponiveis = sorted(df_cc['Mês'].unique())
-                meses_selecionados_cc = st.sidebar.multiselect('Mês', meses_disponiveis, default=[], key='cc_mes_multiselect')
-                
-                cartoes_disponiveis = ['Todos'] + sorted(df_cc['Cartão'].unique().tolist())
-                cartao_selecionado = st.sidebar.selectbox('Cartão', cartoes_disponiveis, key='cc_cartao_select')
-                
-                situacoes_disponiveis = ['Todas'] + sorted(df_cc['Situação'].unique().tolist())
-                situacao_selecionada = st.sidebar.selectbox('Situação', situacoes_disponiveis, key='cc_situacao_select')
-                
-                tipos_compra_disponiveis = ['Todos'] + sorted(df_cc['Tipo de Compra'].unique().tolist())
-                tipo_compra_selecionado = st.sidebar.selectbox('Tipo de Compra', tipos_compra_disponiveis, key='cc_tipo_compra_select')
-
-                # Aplicar filtros
+                # Aplicar filtros definidos na sidebar
                 df_cc_filtrado = df_cc.copy()
-                if anos_selecionados_cc:
-                    df_cc_filtrado = df_cc_filtrado[df_cc_filtrado['Ano'].isin(anos_selecionados_cc)]
-                if meses_selecionados_cc:
-                    df_cc_filtrado = df_cc_filtrado[df_cc_filtrado['Mês'].isin(meses_selecionados_cc)]
-                if cartao_selecionado != 'Todos':
-                    df_cc_filtrado = df_cc_filtrado[df_cc_filtrado['Cartão'] == cartao_selecionado]
-                if situacao_selecionada != 'Todas':
-                    df_cc_filtrado = df_cc_filtrado[df_cc_filtrado['Situação'] == situacao_selecionada]
-                if tipo_compra_selecionado != 'Todos':
-                    df_cc_filtrado = df_cc_filtrado[df_cc_filtrado['Tipo de Compra'] == tipo_compra_selecionado]
+                if st.session_state.get('ano_cc_sidebar'):
+                    df_cc_filtrado = df_cc_filtrado[df_cc_filtrado['Ano'].isin(st.session_state.ano_cc_sidebar)]
+                if st.session_state.get('mes_cc_sidebar'):
+                    df_cc_filtrado = df_cc_filtrado[df_cc_filtrado['Mês'].isin(st.session_state.mes_cc_sidebar)]
+                if st.session_state.get('cartao_cc_sidebar') and st.session_state.cartao_cc_sidebar != 'Todos':
+                    df_cc_filtrado = df_cc_filtrado[df_cc_filtrado['Cartão'] == st.session_state.cartao_cc_sidebar]
+                if st.session_state.get('situacao_cc_sidebar') and st.session_state.situacao_cc_sidebar != 'Todas':
+                    df_cc_filtrado = df_cc_filtrado[df_cc_filtrado['Situação'] == st.session_state.situacao_cc_sidebar]
+                if st.session_state.get('tipo_compra_cc_sidebar') and st.session_state.tipo_compra_cc_sidebar != 'Todos':
+                    df_cc_filtrado = df_cc_filtrado[df_cc_filtrado['Tipo de Compra'] == st.session_state.tipo_compra_cc_sidebar]
+                if st.session_state.get('parcelas_cc_sidebar') and st.session_state.parcelas_cc_sidebar != 'Todas':
+                    df_cc_filtrado = df_cc_filtrado[df_cc_filtrado['Quantidade de parcelas'] == int(st.session_state.parcelas_cc_sidebar)]
+
 
                 # Cards de resumo
                 total_gasto_cc = df_cc_filtrado['valor total da compra'].sum()
                 proxima_fatura = df_cc_filtrado[df_cc_filtrado['Situação'] == 'Pendente']['valor total da compra'].sum()
-                media_mensal = total_gasto_cc / (len(anos_selecionados_cc) * 12) if anos_selecionados_cc else 0
+                
+                # Cálculo da média mensal com base no número de meses únicos nos dados filtrados
+                num_meses_unicos = len(df_cc_filtrado[['Ano', 'Mês']].drop_duplicates()) if not df_cc_filtrado.empty else 1
+                media_mensal = total_gasto_cc / num_meses_unicos if num_meses_unicos > 0 else 0
+
 
                 col1, col2, col3 = st.columns(3)
                 col1.metric("Total Gasto (Filtrado)", format_brl(total_gasto_cc))
@@ -1868,12 +1858,12 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
 
     # --- GRUPO DE ANÁLISE DE ORÇAMENTO ---
     elif selected == "Orçamento":
-        st.markdown("## 📊 Análise de Orçamento Mensal")
+        st.markdown("## 📊 Análise de Orçamento Mensal - Inteligência Financeira")
 
         try:
-            df_orcamento = pd.read_excel(xls, sheet_name='Orcamento')
+            df_orcamento = pd.read_excel(xls, sheet_name='Orcamento', decimal=',')
             if 'Categoria' not in df_orcamento.columns or 'Percentual' not in df_orcamento.columns:
-                st.error("A aba 'Orcamento' deve conter as colunas 'Categoria' and 'Percentual'.")
+                st.error("A aba 'Orcamento' deve conter as colunas 'Categoria' e 'Percentual'.")
                 st.stop()
         except ValueError:
             st.warning("A aba 'Orcamento' não foi encontrada na sua planilha 'Base_financas.xlsx'.")
@@ -1899,24 +1889,54 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
 
         # 2. Calcula a Renda Líquida Base para o orçamento
         total_receitas_periodo = receitas_periodo['VALOR'].sum()
-        # Assume que 'Confeitaria' é um custo de negócio, a ser deduzido das receitas
         custos_negocio = despesas_periodo[despesas_periodo['CATEGORIA'] == 'Confeitaria']['VALOR'].sum()
         renda_liquida_base = total_receitas_periodo + custos_negocio # Custos já são negativos
+        total_orcado = df_orcamento['Percentual'].sum()
 
-        st.metric(
-            "Renda Líquida para Orçamento (Receitas - Custos de 'Confeitaria')",
-            format_brl(renda_liquida_base)
-        )
-        st.caption(f"Cálculo: {format_brl(total_receitas_periodo)} (Receitas) - {format_brl(abs(custos_negocio))} (Custos Confeitaria)")
+        # 3. Cards Principais
+        st.markdown("### 📊 Cards Principais")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.markdown(f"""
+            <div class="metric-card">
+                <h4>Renda Líquida</h4>
+                <h2>{format_brl(renda_liquida_base)}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown(f"""
+            <div class="metric-card">
+                <h4>Total Receitas</h4>
+                <h2>{format_brl(total_receitas_periodo)}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown(f"""
+            <div class="metric-card">
+                <h4>Custos Confeitaria</h4>
+                <h2>{format_brl(abs(custos_negocio))}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col4:
+            st.markdown(f"""
+            <div class="metric-card">
+                <h4>Total Orçado</h4>
+                <h2>{format_brl(total_orcado)}%</h2>
+            </div>
+            """, unsafe_allow_html=True)
 
         st.markdown("---")
 
         if renda_liquida_base > 0:
-            # 3. Calcula os gastos reais por categoria (excluindo os custos de negócio)
+            # 4. Calcula os gastos reais por categoria (excluindo os custos de negócio)
             gastos_reais_cat = despesas_periodo[despesas_periodo['CATEGORIA'] != 'Confeitaria'].groupby('CATEGORIA')['VALOR'].sum().abs().reset_index()
             gastos_reais_cat = gastos_reais_cat.rename(columns={'VALOR': 'Gasto', 'CATEGORIA': 'Categoria'})
 
-            # 4. Cria a tabela de análise do orçamento
+            # 5. Cria a tabela de análise do orçamento
             df_analise = df_orcamento.merge(gastos_reais_cat, on='Categoria', how='left')
             df_analise['Gasto'] = df_analise['Gasto'].fillna(0)
             df_analise['Orcado'] = (df_analise['Percentual'] / 100) * renda_liquida_base
@@ -1926,34 +1946,57 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
             df_analise['%_Uso'] = (df_analise['Gasto'] / df_analise['Orcado'].replace(0, np.nan)) * 100
             df_analise['%_Uso'] = df_analise['%_Uso'].fillna(0)
 
-            # 5. Exibe o progresso por categoria
-            st.markdown("### Progresso por Categoria")
-            for _, row in df_analise.sort_values(by='Percentual', ascending=False).iterrows():
-                st.markdown(f"**{row['Categoria']}** ({row['Percentual']}% do orçamento)")
-                col1, col2 = st.columns([3, 1])
-                
-                # Barra de progresso visual
-                percent_usage_visual = min(row['%_Uso'] / 100, 1.0)
-                prog_bar = col1.progress(percent_usage_visual)
-                
-                # Define a cor da barra de progresso
-                if row['%_Uso'] > 100:
-                    prog_bar.empty()
-                    col1.error(f"Orçamento estourado em {format_brl(abs(row['Saldo']))}!")
-                
-                # Métrica de status
-                delta_color = "normal" if row['Saldo'] >= 0 else "inverse"
-                col2.metric(
-                    label=f"Gasto de {format_brl(row['Gasto'])}",
-                    value=f"{row['%_Uso']:.1f}%",
-                    delta=f"Saldo: {format_brl(row['Saldo'])}",
-                    delta_color=delta_color
-                )
+            # 6. Gráficos de Rosca
+            st.markdown("### 🎯 Gráficos de Distribuição")
+            col_graf1, col_graf2 = st.columns(2)
             
+            with col_graf1:
+                # Gráfico de rosca - Distribuição Orçada
+                fig_orcado = px.pie(
+                    df_orcamento,
+                    values='Percentual',
+                    names='Categoria',
+                    title='Distribuição Orçada por Categoria',
+                    hole=0.5
+                )
+                fig_orcado.update_traces(
+                    textinfo='percent+label',
+                    textposition='outside',
+                    textfont=dict(family='Arial', size=14, color='white')
+                )
+                fig_orcado.update_layout(
+                    title_font_size=20,
+                    legend=dict(orientation='h', yanchor='bottom', y=-0.25, xanchor='center', x=0.5)
+                )
+                st.plotly_chart(fig_orcado, use_container_width=True)
+            
+            with col_graf2:
+                # Gráfico de rosca - Distribuição Real dos Gastos
+                if not gastos_reais_cat.empty:
+                    fig_gasto = px.pie(
+                        gastos_reais_cat,
+                        values='Gasto',
+                        names='Categoria',
+                        title='Distribuição Real dos Gastos',
+                        hole=0.5
+                    )
+                    fig_gasto.update_traces(
+                        textinfo='percent+label',
+                        textposition='outside',
+                        textfont=dict(family='Arial', size=14, color='white')
+                    )
+                    fig_gasto.update_layout(
+                        title_font_size=20,
+                        legend=dict(orientation='h', yanchor='bottom', y=-0.25, xanchor='center', x=0.5)
+                    )
+                    st.plotly_chart(fig_gasto, use_container_width=True)
+                else:
+                    st.info('Não há gastos reais para exibir no gráfico.')
+
             st.markdown("---")
 
-            # 6. Gráfico de Comparação
-            st.markdown("### Gráfico: Orçado vs. Gasto")
+            # 7. Gráfico de Barras Comparativo
+            st.markdown("### 📊 Gráfico: Orçado vs. Gasto Real")
             df_plot = df_analise.melt(
                 id_vars=['Categoria'],
                 value_vars=['Orcado', 'Gasto'],
@@ -1971,24 +2014,155 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
                 text_auto='.2s'
             )
             fig_orcamento.update_traces(textposition='outside')
-            fig_orcamento.update_layout(yaxis_tickformat="R$,.2f")
+            fig_orcamento.update_layout(
+                xaxis_tickangle=-45,
+                height=500,
+                margin=dict(t=60, b=120, l=0, r=0)
+            )
             st.plotly_chart(fig_orcamento, use_container_width=True)
 
-            # 7. Tabela Detalhada
-            st.markdown("### Tabela de Acompanhamento")
-            df_display = df_analise[['Categoria', 'Percentual', 'Orcado', 'Gasto', 'Saldo', '%_Uso']]
+            st.markdown("---")
+
+            # 8. Cards de Progresso por Categoria
+            st.markdown("### 🎯 Progresso por Categoria")
+            for _, row in df_analise.sort_values(by='Percentual', ascending=False).iterrows():
+                st.markdown(f"**{row['Categoria']}** ({row['Percentual']}% do orçamento)")
+                col1, col2 = st.columns([3, 1])
+                
+                # Barra de progresso visual com cores
+                percent_usage_visual = min(row['%_Uso'] / 100, 1.0)
+                
+                # Define cor da barra baseada no percentual
+                if row['%_Uso'] <= 80:
+                    bar_color = "green"
+                elif row['%_Uso'] <= 100:
+                    bar_color = "orange"
+                else:
+                    bar_color = "red"
+                
+                prog_bar = col1.progress(percent_usage_visual)
+                
+                # Define a cor da barra de progresso
+                if row['%_Uso'] > 100:
+                    prog_bar.empty()
+                    col1.error(f"Orçamento estourado em {format_brl(abs(row['Saldo']))}!")
+                
+                # Métrica de status com cores
+                delta_color = "normal" if row['Saldo'] >= 0 else "inverse"
+                col2.metric(
+                    label=f"Gasto de {format_brl(row['Gasto'])}",
+                    value=f"{row['%_Uso']:.1f}%",
+                    delta=f"Saldo: {format_brl(row['Saldo'])}",
+                    delta_color=delta_color
+                )
+            
+            st.markdown("---")
+
+            # 9. Editor de Percentuais
+            with st.expander("⚙️ Editar Percentuais", expanded=False):
+                st.markdown("### Ajuste os percentuais do orçamento")
+                
+                # Criar sliders para cada categoria
+                novos_percentuais = {}
+                total_atual = 0
+                
+                for _, row in df_orcamento.iterrows():
+                    categoria = row['Categoria']
+                    percentual_atual = row['Percentual']
+                    total_atual += percentual_atual
+                    
+                    novo_percentual = st.slider(
+                        f"{categoria}",
+                        min_value=0.0,
+                        max_value=100.0,
+                        value=float(percentual_atual),
+                        step=1.0,
+                        key=f"slider_{categoria}"
+                    )
+                    novos_percentuais[categoria] = novo_percentual
+                
+                # Calcular total
+                total_novo = sum(novos_percentuais.values())
+                
+                # Mostrar total e validação
+                col_total1, col_total2 = st.columns(2)
+                with col_total1:
+                    st.metric("Total Atual", f"{total_atual:.1f}%")
+                with col_total2:
+                    if total_novo == 100:
+                        st.success(f"Total: {total_novo:.1f}% ✅")
+                    elif total_novo < 100:
+                        st.warning(f"Total: {total_novo:.1f}% ⚠️ (Falta {100-total_novo:.1f}%)")
+                    else:
+                        st.error(f"Total: {total_novo:.1f}% ❌ (Excesso {total_novo-100:.1f}%)")
+                
+                # Botão para salvar
+                if st.button("💾 Salvar Percentuais", type="primary"):
+                    if total_novo == 100:
+                        try:
+                            # Atualizar o dataframe
+                            for categoria, percentual in novos_percentuais.items():
+                                df_orcamento.loc[df_orcamento['Categoria'] == categoria, 'Percentual'] = percentual
+                            
+                            # Salvar no Excel
+                            with pd.ExcelWriter(excel_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+                                df_orcamento.to_excel(writer, sheet_name='Orcamento', index=False)
+                            
+                            st.success("✅ Percentuais salvos com sucesso!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Erro ao salvar: {e}")
+                    else:
+                        st.error("❌ O total deve ser exatamente 100% para salvar.")
+
+            # 10. Tabela de Acompanhamento
+            st.markdown("---")
+            st.markdown("### 📋 Tabela de Acompanhamento")
+            df_display = df_analise[['Categoria', 'Percentual', 'Orcado', 'Gasto', 'Saldo', '%_Uso']].copy()
+            
+            # Formatação para exibição
+            df_display['Percentual'] = df_display['Percentual'].map('{:.1f}%'.format)
+            df_display['Orcado'] = df_display['Orcado'].map('R$ {:,.2f}'.format)
+            df_display['Gasto'] = df_display['Gasto'].map('R$ {:,.2f}'.format)
+            df_display['Saldo'] = df_display['Saldo'].map('R$ {:,.2f}'.format)
+            df_display['%_Uso'] = df_display['%_Uso'].map('{:.1f}%'.format)
+
             st.dataframe(
-                df_display.style
-                .format({
-                    'Percentual': '{:.1f}%',
-                    'Orcado': 'R$ {:,.2f}',
-                    'Gasto': 'R$ {:,.2f}',
-                    'Saldo': 'R$ {:,.2f}',
-                    '%_Uso': '{:.1f}%'
-                }),
+                df_display,
                 use_container_width=True,
                 hide_index=True
             )
+
+            # 11. Botões de Ação
+            st.markdown("---")
+            col_btn1, col_btn2, col_btn3 = st.columns(3)
+            
+            with col_btn1:
+                if st.button("➕ Adicionar Despesa", use_container_width=True, type="primary"):
+                    st.session_state.show_despesa_form = True
+            
+            with col_btn2:
+                if st.button("📄 Exportar Relatório", use_container_width=True):
+                    try:
+                        # Criar relatório PDF
+                        relatorio = RelatorioPDF()
+                        dados_relatorio = {
+                            'renda_liquida': renda_liquida_base,
+                            'total_receitas': total_receitas_periodo,
+                            'custos_confeitaria': abs(custos_negocio),
+                            'df_analise': df_analise,
+                            'periodo': f"{', '.join(meses_selecionados)}/{', '.join(anos_selecionados)}"
+                        }
+                        filename = relatorio.generate_orcamento_report(dados_relatorio, "relatorio_orcamento.pdf")
+                        st.success("✅ Relatório gerado com sucesso!")
+                        create_download_button(filename, "📥 Download Relatório Orçamento")
+                    except Exception as e:
+                        st.error(f"❌ Erro ao gerar relatório: {e}")
+            
+            with col_btn3:
+                if st.button("🔄 Atualizar Dados", use_container_width=True):
+                    st.rerun()
+
         else:
             st.warning("A Renda Líquida para o período selecionado é zero ou negativa. O cálculo do orçamento não pode ser realizado.")
 
@@ -2164,7 +2338,7 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
             # Carregar dados para os selects
             df_conta = pd.read_excel(xls, sheet_name='Conta')
             contas = df_conta['Contas'].dropna().unique().tolist()
-            df_vendas_base = pd.read_excel(xls, sheet_name='Vendas')
+            df_vendas_base = pd.read_excel(xls, sheet_name='Vendas', decimal=',')
             tipos_recebimento = df_vendas_base['TIPO DE RECEBIMENTO'].dropna().unique().tolist()
             clientes = df_vendas_base['Cliente'].dropna().unique().tolist()
 
@@ -2225,7 +2399,7 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
         with st.container():
             with st.form("cc_form", clear_on_submit=True):
                 st.subheader("Preencha os dados da compra:")
-                df_cc_base = pd.read_excel(xls, sheet_name='Div_CC')
+                df_cc_base = pd.read_excel(xls, sheet_name='Div_CC', decimal=',')
                 cartoes = df_cc_base['Cartão'].dropna().unique().tolist()
                 tipos_compra = df_cc_base['Tipo de Compra'].dropna().unique().tolist()
 
@@ -2275,7 +2449,7 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
         st.subheader("✏️ Editar Venda")
         with st.container():
             # Carregar dados filtrados de vendas
-            df_vendas = pd.read_excel(xls, sheet_name='Vendas')
+            df_vendas = pd.read_excel(xls, sheet_name='Vendas', decimal=',')
             df_vendas['DATA'] = pd.to_datetime(df_vendas['DATA'], errors='coerce')
             df_vendas = df_vendas.dropna(subset=['DATA'])
             df_vendas['Ano'] = df_vendas['DATA'].dt.year.astype(str)
@@ -2358,7 +2532,7 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
         st.subheader("✏️ Editar Investimento")
         with st.container():
             # Carregar dados filtrados de investimentos
-            df_investimentos = pd.read_excel(xls, sheet_name='Investimentos')
+            df_investimentos = pd.read_excel(xls, sheet_name='Investimentos', decimal=',')
             df_investimentos['DATA'] = pd.to_datetime(df_investimentos['DATA'], errors='coerce')
             df_investimentos = df_investimentos.dropna(subset=['DATA'])
             df_investimentos['Ano'] = df_investimentos['DATA'].dt.year.astype(str)
@@ -2437,7 +2611,7 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
         st.subheader("✏️ Editar Compra no Cartão")
         with st.container():
             # Carregar dados filtrados de cartão de crédito
-            df_cc = pd.read_excel(xls, sheet_name='Div_CC')
+            df_cc = pd.read_excel(xls, sheet_name='Div_CC', decimal=',')
             df_cc['Data'] = pd.to_datetime(df_cc['Data'], errors='coerce')
             df_cc.dropna(subset=['Data'], inplace=True)
             df_cc['Ano'] = df_cc['Data'].dt.year.astype(str)
@@ -2519,7 +2693,7 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
         st.subheader("🗑️ Excluir Venda")
         with st.container():
             # Carregar dados filtrados de vendas
-            df_vendas = pd.read_excel(xls, sheet_name='Vendas')
+            df_vendas = pd.read_excel(xls, sheet_name='Vendas', decimal=',')
             df_vendas['DATA'] = pd.to_datetime(df_vendas['DATA'], errors='coerce')
             df_vendas = df_vendas.dropna(subset=['DATA'])
             df_vendas['Ano'] = df_vendas['DATA'].dt.year.astype(str)
@@ -2645,7 +2819,7 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
         st.subheader("🗑️ Exclusão em Lote - Vendas")
         with st.container():
             # Carregar dados filtrados de vendas
-            df_vendas = pd.read_excel(xls, sheet_name='Vendas')
+            df_vendas = pd.read_excel(xls, sheet_name='Vendas', decimal=',')
             df_vendas['DATA'] = pd.to_datetime(df_vendas['DATA'], errors='coerce')
             df_vendas = df_vendas.dropna(subset=['DATA'])
             df_vendas['Ano'] = df_vendas['DATA'].dt.year.astype(str)
@@ -2764,7 +2938,7 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
         st.subheader("🗑️ Exclusão em Lote - Compras no Cartão")
         with st.container():
             # Carregar dados filtrados de cartão de crédito
-            df_cc = pd.read_excel(xls, sheet_name='Div_CC')
+            df_cc = pd.read_excel(xls, sheet_name='Div_CC', decimal=',')
             df_cc['Data'] = pd.to_datetime(df_cc['Data'], errors='coerce')
             df_cc.dropna(subset=['Data'], inplace=True)
             df_cc['Ano'] = df_cc['Data'].dt.year.astype(str)
@@ -2829,7 +3003,7 @@ try: # --- BLOCO DE CAPTURA DE ERRO GLOBAL ---
                 st.subheader("Preencha os dados do investimento:")
                 
                 # Carregar dados existentes para sugestões
-                df_investimentos_base = pd.read_excel(xls, sheet_name='Investimentos')
+                df_investimentos_base = pd.read_excel(xls, sheet_name='Investimentos', decimal=',')
                 tipos_investimento = df_investimentos_base['TIPO'].dropna().unique().tolist()
                 ativos = df_investimentos_base['ATIVO'].dropna().unique().tolist()
                 objetivos = df_investimentos_base['OBJETIVO'].dropna().unique().tolist()
