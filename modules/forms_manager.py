@@ -501,5 +501,302 @@ class FormsManager:
             st.session_state['show_bulk_delete_Despesas'] = False
             st.rerun()
 
+    def render_edit_sale_form(self, df_vendas, crud_system):
+        st.markdown("### ✏️ Editar Venda")
+        if df_vendas.empty:
+            st.info("Nenhuma venda disponível para editar.")
+            return
+        
+        df_vendas = df_vendas.reset_index(drop=True)
+        idx = st.selectbox("Selecione a venda para editar:", df_vendas.index, format_func=lambda i: f"{df_vendas.at[i, 'DATA']} - {df_vendas.at[i, 'Cliente']} - {format_currency(df_vendas.at[i, 'VALOR'])}")
+        venda = df_vendas.loc[idx]
+        
+        with st.form("edit_sale_form", clear_on_submit=True):
+            data = st.date_input("Data", value=pd.to_datetime(venda["DATA"]))
+            cliente = st.text_input("Cliente", value=venda.get("Cliente", ""))
+            produto = st.text_input("Produto/Serviço", value=venda.get("Produto", ""))
+            valor = st.number_input("Valor (R$)", min_value=0.01, value=float(venda["VALOR"]), step=0.01)
+            forma_pagamento = st.text_input("Forma de Pagamento", value=venda.get("Forma_Pagamento", ""))
+            observacoes = st.text_area("Observações", value=venda.get("Observações", ""))
+            submitted = st.form_submit_button("Salvar Alterações", type="primary")
+            if submitted:
+                novos_dados = {
+                    "DATA": data,
+                    "Cliente": cliente,
+                    "Produto": produto,
+                    "VALOR": valor,
+                    "Forma_Pagamento": forma_pagamento,
+                    "Observações": observacoes
+                }
+                sucesso = crud_system.update_record("Vendas", idx, novos_dados)
+                if sucesso:
+                    st.success("Venda atualizada com sucesso!")
+                    data_manager.clear_cache()
+                    st.rerun()
+                else:
+                    st.error("Erro ao atualizar venda.")
+
+    def render_delete_sale_form(self, df_vendas, crud_system):
+        st.markdown("### 🗑️ Excluir Venda")
+        if df_vendas.empty:
+            st.info("Nenhuma venda disponível para excluir.")
+            return
+        
+        df_vendas = df_vendas.reset_index(drop=True)
+        idx = st.selectbox("Selecione a venda para excluir:", df_vendas.index, format_func=lambda i: f"{df_vendas.at[i, 'DATA']} - {df_vendas.at[i, 'Cliente']} - {format_currency(df_vendas.at[i, 'VALOR'])}")
+        venda = df_vendas.loc[idx]
+        st.write(f"**Cliente:** {venda.get('Cliente', '')}")
+        st.write(f"**Produto:** {venda.get('Produto', '')}")
+        st.write(f"**Valor:** {format_currency(venda.get('VALOR', 0))}")
+        if st.button("Confirmar Exclusão", type="primary"):
+            sucesso = crud_system.delete_record("Vendas", idx)
+            if sucesso:
+                st.success("Venda excluída com sucesso!")
+                data_manager.clear_cache()
+                st.rerun()
+            else:
+                st.error("Erro ao excluir venda.")
+
+    def render_bulk_delete_sale_form(self, df_vendas, crud_system):
+        st.markdown("### 🗑️ Exclusão em Lote de Vendas")
+        if df_vendas.empty:
+            st.info("Nenhuma venda disponível para exclusão em lote.")
+            return
+        
+        df_vendas = df_vendas.reset_index(drop=True)
+        indices = st.multiselect("Selecione as vendas para excluir:", df_vendas.index, format_func=lambda i: f"{df_vendas.at[i, 'DATA']} - {df_vendas.at[i, 'Cliente']} - {format_currency(df_vendas.at[i, 'VALOR'])}")
+        if st.button("Excluir Selecionadas", type="primary") and indices:
+            sucesso = True
+            for idx in sorted(indices, reverse=True):
+                if not crud_system.delete_record("Vendas", idx):
+                    sucesso = False
+            if sucesso:
+                st.success("Vendas excluídas com sucesso!")
+                data_manager.clear_cache()
+                st.rerun()
+            else:
+                st.error("Erro ao excluir uma ou mais vendas.")
+
+    def render_edit_revenue_form(self, df_receitas, crud_system):
+        st.markdown("### ✏️ Editar Receita")
+        if df_receitas.empty:
+            st.info("Nenhuma receita disponível para editar.")
+            return
+        
+        df_receitas = df_receitas.reset_index(drop=True)
+        idx = st.selectbox("Selecione a receita para editar:", df_receitas.index, format_func=lambda i: f"{df_receitas.at[i, 'DATA']} - {df_receitas.at[i, 'DESCRIÇÃO']} - {format_currency(df_receitas.at[i, 'VALOR'])}")
+        receita = df_receitas.loc[idx]
+        
+        with st.form("edit_revenue_form", clear_on_submit=True):
+            data = st.date_input("Data", value=pd.to_datetime(receita["DATA"]))
+            descricao = st.text_input("Descrição", value=receita.get("DESCRIÇÃO", ""))
+            categoria = st.selectbox("Categoria", options=["Salário", "Freelance", "Investimentos", "Outros"], index=0)
+            valor = st.number_input("Valor (R$)", min_value=0.01, value=float(receita["VALOR"]), step=0.01)
+            submitted = st.form_submit_button("Salvar Alterações", type="primary")
+            if submitted:
+                novos_dados = {
+                    "DATA": data,
+                    "DESCRIÇÃO": descricao,
+                    "CATEGORIA": categoria,
+                    "VALOR": valor
+                }
+                sucesso = crud_system.update_record("Receitas", idx, novos_dados)
+                if sucesso:
+                    st.success("Receita atualizada com sucesso!")
+                    data_manager.clear_cache()
+                    st.rerun()
+                else:
+                    st.error("Erro ao atualizar receita.")
+
+    def render_delete_revenue_form(self, df_receitas, crud_system):
+        st.markdown("### 🗑️ Excluir Receita")
+        if df_receitas.empty:
+            st.info("Nenhuma receita disponível para excluir.")
+            return
+        
+        df_receitas = df_receitas.reset_index(drop=True)
+        idx = st.selectbox("Selecione a receita para excluir:", df_receitas.index, format_func=lambda i: f"{df_receitas.at[i, 'DATA']} - {df_receitas.at[i, 'DESCRIÇÃO']} - {format_currency(df_receitas.at[i, 'VALOR'])}")
+        receita = df_receitas.loc[idx]
+        st.write(f"**Descrição:** {receita.get('DESCRIÇÃO', '')}")
+        st.write(f"**Categoria:** {receita.get('CATEGORIA', '')}")
+        st.write(f"**Valor:** {format_currency(receita.get('VALOR', 0))}")
+        if st.button("Confirmar Exclusão", type="primary"):
+            sucesso = crud_system.delete_record("Receitas", idx)
+            if sucesso:
+                st.success("Receita excluída com sucesso!")
+                data_manager.clear_cache()
+                st.rerun()
+            else:
+                st.error("Erro ao excluir receita.")
+
+    def render_bulk_delete_revenue_form(self, df_receitas, crud_system):
+        st.markdown("### 🗑️ Exclusão em Lote de Receitas")
+        if df_receitas.empty:
+            st.info("Nenhuma receita disponível para exclusão em lote.")
+            return
+        
+        df_receitas = df_receitas.reset_index(drop=True)
+        indices = st.multiselect("Selecione as receitas para excluir:", df_receitas.index, format_func=lambda i: f"{df_receitas.at[i, 'DATA']} - {df_receitas.at[i, 'DESCRIÇÃO']} - {format_currency(df_receitas.at[i, 'VALOR'])}")
+        if st.button("Excluir Selecionadas", type="primary") and indices:
+            sucesso = True
+            for idx in sorted(indices, reverse=True):
+                if not crud_system.delete_record("Receitas", idx):
+                    sucesso = False
+            if sucesso:
+                st.success("Receitas excluídas com sucesso!")
+                data_manager.clear_cache()
+                st.rerun()
+            else:
+                st.error("Erro ao excluir uma ou mais receitas.")
+
+    def render_edit_credit_card_form(self, df_cc, crud_system):
+        st.markdown("### ✏️ Editar Despesa no Cartão")
+        if df_cc.empty:
+            st.info("Nenhuma despesa no cartão disponível para editar.")
+            return
+        
+        df_cc = df_cc.reset_index(drop=True)
+        idx = st.selectbox("Selecione a despesa para editar:", df_cc.index, format_func=lambda i: f"{df_cc.at[i, 'DATA']} - {df_cc.at[i, 'DESCRIÇÃO']} - {format_currency(df_cc.at[i, 'VALOR'])}")
+        cc_item = df_cc.loc[idx]
+        
+        with st.form("edit_credit_card_form", clear_on_submit=True):
+            data = st.date_input("Data", value=pd.to_datetime(cc_item["DATA"]))
+            descricao = st.text_input("Descrição", value=cc_item.get("DESCRIÇÃO", ""))
+            categoria = st.text_input("Categoria", value=cc_item.get("CATEGORIA", ""))
+            valor = st.number_input("Valor (R$)", min_value=0.01, value=float(cc_item["VALOR"]), step=0.01)
+            cartao = st.text_input("Cartão", value=cc_item.get("CARTAO", ""))
+            submitted = st.form_submit_button("Salvar Alterações", type="primary")
+            if submitted:
+                novos_dados = {
+                    "DATA": data,
+                    "DESCRIÇÃO": descricao,
+                    "CATEGORIA": categoria,
+                    "VALOR": valor,
+                    "CARTAO": cartao
+                }
+                sucesso = crud_system.update_record("Div_CC", idx, novos_dados)
+                if sucesso:
+                    st.success("Despesa no cartão atualizada com sucesso!")
+                    data_manager.clear_cache()
+                    st.rerun()
+                else:
+                    st.error("Erro ao atualizar despesa no cartão.")
+
+    def render_delete_credit_card_form(self, df_cc, crud_system):
+        st.markdown("### 🗑️ Excluir Despesa no Cartão")
+        if df_cc.empty:
+            st.info("Nenhuma despesa no cartão disponível para excluir.")
+            return
+        
+        df_cc = df_cc.reset_index(drop=True)
+        idx = st.selectbox("Selecione a despesa para excluir:", df_cc.index, format_func=lambda i: f"{df_cc.at[i, 'DATA']} - {df_cc.at[i, 'DESCRIÇÃO']} - {format_currency(df_cc.at[i, 'VALOR'])}")
+        cc_item = df_cc.loc[idx]
+        st.write(f"**Descrição:** {cc_item.get('DESCRIÇÃO', '')}")
+        st.write(f"**Categoria:** {cc_item.get('CATEGORIA', '')}")
+        st.write(f"**Cartão:** {cc_item.get('CARTAO', '')}")
+        st.write(f"**Valor:** {format_currency(cc_item.get('VALOR', 0))}")
+        if st.button("Confirmar Exclusão", type="primary"):
+            sucesso = crud_system.delete_record("Div_CC", idx)
+            if sucesso:
+                st.success("Despesa no cartão excluída com sucesso!")
+                data_manager.clear_cache()
+                st.rerun()
+            else:
+                st.error("Erro ao excluir despesa no cartão.")
+
+    def render_bulk_delete_credit_card_form(self, df_cc, crud_system):
+        st.markdown("### 🗑️ Exclusão em Lote de Despesas no Cartão")
+        if df_cc.empty:
+            st.info("Nenhuma despesa no cartão disponível para exclusão em lote.")
+            return
+        
+        df_cc = df_cc.reset_index(drop=True)
+        indices = st.multiselect("Selecione as despesas para excluir:", df_cc.index, format_func=lambda i: f"{df_cc.at[i, 'DATA']} - {df_cc.at[i, 'DESCRIÇÃO']} - {format_currency(df_cc.at[i, 'VALOR'])}")
+        if st.button("Excluir Selecionadas", type="primary") and indices:
+            sucesso = True
+            for idx in sorted(indices, reverse=True):
+                if not crud_system.delete_record("Div_CC", idx):
+                    sucesso = False
+            if sucesso:
+                st.success("Despesas no cartão excluídas com sucesso!")
+                data_manager.clear_cache()
+                st.rerun()
+            else:
+                st.error("Erro ao excluir uma ou mais despesas no cartão.")
+
+    def render_edit_investment_form(self, df_investimentos, crud_system):
+        st.markdown("### ✏️ Editar Investimento")
+        if df_investimentos.empty:
+            st.info("Nenhum investimento disponível para editar.")
+            return
+        
+        df_investimentos = df_investimentos.reset_index(drop=True)
+        idx = st.selectbox("Selecione o investimento para editar:", df_investimentos.index, format_func=lambda i: f"{df_investimentos.at[i, 'DATA']} - {df_investimentos.at[i, 'ATIVO']} - {format_currency(df_investimentos.at[i, 'VALOR_APORTE'])}")
+        investimento = df_investimentos.loc[idx]
+        
+        with st.form("edit_investment_form", clear_on_submit=True):
+            data = st.date_input("Data", value=pd.to_datetime(investimento["DATA"]))
+            ativo = st.text_input("Ativo", value=investimento.get("ATIVO", ""))
+            valor_aporte = st.number_input("Valor do Aporte (R$)", min_value=0.01, value=float(investimento["VALOR_APORTE"]), step=0.01)
+            tipo_investimento = st.selectbox("Tipo de Investimento", options=["Ações", "Fundos", "Renda Fixa", "Criptomoedas", "Outros"], index=0)
+            observacoes = st.text_area("Observações", value=investimento.get("OBSERVACOES", ""))
+            submitted = st.form_submit_button("Salvar Alterações", type="primary")
+            if submitted:
+                novos_dados = {
+                    "DATA": data,
+                    "ATIVO": ativo,
+                    "VALOR_APORTE": valor_aporte,
+                    "TIPO_INVESTIMENTO": tipo_investimento,
+                    "OBSERVACOES": observacoes
+                }
+                sucesso = crud_system.update_record("Investimentos", idx, novos_dados)
+                if sucesso:
+                    st.success("Investimento atualizado com sucesso!")
+                    data_manager.clear_cache()
+                    st.rerun()
+                else:
+                    st.error("Erro ao atualizar investimento.")
+
+    def render_delete_investment_form(self, df_investimentos, crud_system):
+        st.markdown("### 🗑️ Excluir Investimento")
+        if df_investimentos.empty:
+            st.info("Nenhum investimento disponível para excluir.")
+            return
+        
+        df_investimentos = df_investimentos.reset_index(drop=True)
+        idx = st.selectbox("Selecione o investimento para excluir:", df_investimentos.index, format_func=lambda i: f"{df_investimentos.at[i, 'DATA']} - {df_investimentos.at[i, 'ATIVO']} - {format_currency(df_investimentos.at[i, 'VALOR_APORTE'])}")
+        investimento = df_investimentos.loc[idx]
+        st.write(f"**Ativo:** {investimento.get('ATIVO', '')}")
+        st.write(f"**Tipo:** {investimento.get('TIPO_INVESTIMENTO', '')}")
+        st.write(f"**Valor:** {format_currency(investimento.get('VALOR_APORTE', 0))}")
+        if st.button("Confirmar Exclusão", type="primary"):
+            sucesso = crud_system.delete_record("Investimentos", idx)
+            if sucesso:
+                st.success("Investimento excluído com sucesso!")
+                data_manager.clear_cache()
+                st.rerun()
+            else:
+                st.error("Erro ao excluir investimento.")
+
+    def render_bulk_delete_investment_form(self, df_investimentos, crud_system):
+        st.markdown("### 🗑️ Exclusão em Lote de Investimentos")
+        if df_investimentos.empty:
+            st.info("Nenhum investimento disponível para exclusão em lote.")
+            return
+        
+        df_investimentos = df_investimentos.reset_index(drop=True)
+        indices = st.multiselect("Selecione os investimentos para excluir:", df_investimentos.index, format_func=lambda i: f"{df_investimentos.at[i, 'DATA']} - {df_investimentos.at[i, 'ATIVO']} - {format_currency(df_investimentos.at[i, 'VALOR_APORTE'])}")
+        if st.button("Excluir Selecionados", type="primary") and indices:
+            sucesso = True
+            for idx in sorted(indices, reverse=True):
+                if not crud_system.delete_record("Investimentos", idx):
+                    sucesso = False
+            if sucesso:
+                st.success("Investimentos excluídos com sucesso!")
+                data_manager.clear_cache()
+                st.rerun()
+            else:
+                st.error("Erro ao excluir um ou mais investimentos.")
+
 # Instância global
 forms_manager = FormsManager() 

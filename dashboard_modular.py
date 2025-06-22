@@ -165,15 +165,15 @@ def main():
     if selected == "📊 Visão Geral":
         show_overview(receitas_filtradas, despesas_filtradas, filters)
     elif selected == "💸 Despesas":
-        show_expenses(despesas_filtradas, filters, crud_system, forms_manager())
+        show_expenses(despesas_filtradas, filters, crud_system, forms_manager)
     elif selected == "💰 Receitas":
-        show_revenues(receitas_filtradas, filters)
+        show_revenues(receitas_filtradas, filters, crud_system, forms_manager)
     elif selected == "🛒 Vendas":
-        show_sales(vendas_filtradas, filters)
+        show_sales(vendas_filtradas, filters, crud_system, forms_manager)
     elif selected == "💳 Cartão de Crédito":
-        show_credit_card(cc_filtrado, filters)
+        show_credit_card(cc_filtrado, filters, crud_system, forms_manager)
     elif selected == "💰 Investimentos":
-        show_investments(investimentos_filtrados, filters)
+        show_investments(investimentos_filtrados, filters, crud_system, forms_manager)
     elif selected == "📋 Orçamento":
         show_budget(receitas_filtradas, despesas_filtradas, orcamento, filters)
     elif selected == "📈 Análises":
@@ -331,6 +331,71 @@ def show_expenses(despesas, filters, crud_system, forms_manager):
     
     st.divider()
 
+    # Métricas principais
+    col1, col2, col3, col4 = st.columns(4)
+    
+    total_despesas = despesas["VALOR"].sum() if "VALOR" in despesas.columns and not despesas.empty else 0
+    num_despesas = len(despesas) if not despesas.empty else 0
+    valor_medio = total_despesas / num_despesas if num_despesas > 0 else 0
+    num_categorias = despesas["CATEGORIA"].nunique() if "CATEGORIA" in despesas.columns and not despesas.empty else 0
+    
+    # Determinar se despesas estão controladas (baseado no valor médio)
+    # Considerando que despesas são valores negativos, vamos usar o valor absoluto
+    valor_medio_abs = abs(valor_medio)
+    if valor_medio_abs <= 500:  # Limite arbitrário para "controlado"
+        status_icon = "🎯"
+        status_title = "Despesas Controladas"
+        status_color = "green"
+        status_message = "Bom controle! 👍"
+    else:
+        status_icon = "📈"
+        status_title = "Despesas Altas"
+        status_color = "orange"
+        status_message = "Atenção aos gastos! ⚠️"
+    
+    with col1:
+        render_metric_card(
+            title="Total Despesas",
+            value=format_currency(total_despesas),
+            icon="💸"
+        )
+    with col2:
+        render_metric_card(
+            title="Nº de Despesas",
+            value=str(num_despesas),
+            icon="📈"
+        )
+    with col3:
+        render_metric_card(
+            title="Valor Médio",
+            value=format_currency(valor_medio),
+            icon="📊"
+        )
+    with col4:
+        # Card personalizado para status das despesas
+        st.markdown(f"""
+        <div style="
+            background: linear-gradient(135deg, {'#d4edda' if status_color == 'green' else '#fff3cd'}, {'#c3e6cb' if status_color == 'green' else '#ffeaa7'});
+            border: 2px solid {'#28a745' if status_color == 'green' else '#ffc107'};
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin: 10px 0;
+        ">
+            <div style="font-size: 2.5em; margin-bottom: 10px;">{status_icon}</div>
+            <div style="font-size: 1.2em; font-weight: bold; color: {'#155724' if status_color == 'green' else '#856404'}; margin-bottom: 5px;">
+                {status_title}
+            </div>
+            <div style="font-size: 1.1em; color: {'#155724' if status_color == 'green' else '#856404'}; margin-bottom: 5px;">
+                Média: {format_currency(valor_medio_abs)}
+            </div>
+            <div style="font-size: 0.9em; color: {'#155724' if status_color == 'green' else '#856404'}; margin-top: 5px;">
+                {status_message}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
     # Tabela de transações (agora renderizada antes dos formulários)
     st.markdown("### 📋 Transações")
     if not despesas.empty:
@@ -358,160 +423,438 @@ def show_expenses(despesas, filters, crud_system, forms_manager):
     if st.session_state.get("show_bulk_delete_Despesas", False):
         forms_manager.render_bulk_delete_expense_form(despesas, crud_system)
 
-def show_revenues(receitas, filters):
+def show_revenues(receitas, filters, crud_system, forms_manager):
     st.markdown("## 💰 Análise de Receitas")
-    
-    # Botões CRUD
-    col_crud1, col_crud2, col_crud3, col_crud4 = st.columns(4)
-    with col_crud1:
+
+    # --- BOTÕES DE AÇÃO UNIFICADOS ---
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
         if st.button("➕ Nova Receita", type="primary", use_container_width=True):
-            st.session_state.show_revenue_form = True
-    with col_crud2:
+            st.session_state.show_revenue_form = not st.session_state.get("show_revenue_form", False)
+            st.session_state.show_edit_Receitas = False
+            st.session_state.show_delete_Receitas = False
+            st.session_state.show_bulk_delete_Receitas = False
+    with col2:
         if st.button("✏️ Editar", use_container_width=True):
-            st.session_state.show_edit_Receitas = True
-    with col_crud3:
+            st.session_state.show_edit_Receitas = not st.session_state.get("show_edit_Receitas", False)
+            st.session_state.show_revenue_form = False
+            st.session_state.show_delete_Receitas = False
+            st.session_state.show_bulk_delete_Receitas = False
+    with col3:
         if st.button("🗑️ Excluir", use_container_width=True):
-            st.session_state.show_delete_Receitas = True
-    with col_crud4:
-        if st.button("🗑️ Exclusão em Lote", use_container_width=True):
-            st.session_state.show_bulk_delete_Receitas = True
+            st.session_state.show_delete_Receitas = not st.session_state.get("show_delete_Receitas", False)
+            st.session_state.show_revenue_form = False
+            st.session_state.show_edit_Receitas = False
+            st.session_state.show_bulk_delete_Receitas = False
+    with col4:
+        if st.button("🗑️ Excl. em Lote", use_container_width=True):
+            st.session_state.show_bulk_delete_Receitas = not st.session_state.get("show_bulk_delete_Receitas", False)
+            st.session_state.show_revenue_form = False
+            st.session_state.show_edit_Receitas = False
+            st.session_state.show_delete_Receitas = False
     
-    # Formulário de nova receita
-    if st.session_state.get("show_revenue_form", False):
-        with st.expander("💰 Nova Receita", expanded=True):
-            forms_manager.create_revenue_form()
-            if st.button("❌ Fechar"):
-                st.session_state.show_revenue_form = False
-                st.rerun()
+    st.divider()
+
+    # Métricas principais
+    col1, col2, col3, col4 = st.columns(4)
     
+    total_receitas = receitas["VALOR"].sum() if "VALOR" in receitas.columns and not receitas.empty else 0
+    num_receitas = len(receitas) if not receitas.empty else 0
+    valor_medio = total_receitas / num_receitas if num_receitas > 0 else 0
+    num_categorias = receitas["CATEGORIA"].nunique() if "CATEGORIA" in receitas.columns and not receitas.empty else 0
+    
+    # Determinar se receitas estão boas (baseado no valor médio)
+    if valor_medio >= 1000:  # Limite arbitrário para "boas receitas"
+        status_icon = "🚀"
+        status_title = "Receitas Excelentes"
+        status_color = "green"
+        status_message = "Continue assim! 💪"
+    elif valor_medio >= 500:
+        status_icon = "📈"
+        status_title = "Receitas Boas"
+        status_color = "blue"
+        status_message = "Bom desempenho! 👍"
+    else:
+        status_icon = "💡"
+        status_title = "Receitas Baixas"
+        status_color = "orange"
+        status_message = "Busque oportunidades! 🔍"
+    
+    with col1:
+        render_metric_card(
+            title="Total Receitas",
+            value=format_currency(total_receitas),
+            icon="💰"
+        )
+    with col2:
+        render_metric_card(
+            title="Nº de Receitas",
+            value=str(num_receitas),
+            icon="📈"
+        )
+    with col3:
+        render_metric_card(
+            title="Valor Médio",
+            value=format_currency(valor_medio),
+            icon="📊"
+        )
+    with col4:
+        # Card personalizado para status das receitas
+        st.markdown(f"""
+        <div style="
+            background: linear-gradient(135deg, {'#d4edda' if status_color == 'green' else '#d1ecf1' if status_color == 'blue' else '#fff3cd'}, {'#c3e6cb' if status_color == 'green' else '#bee5eb' if status_color == 'blue' else '#ffeaa7'});
+            border: 2px solid {'#28a745' if status_color == 'green' else '#17a2b8' if status_color == 'blue' else '#ffc107'};
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin: 10px 0;
+        ">
+            <div style="font-size: 2.5em; margin-bottom: 10px;">{status_icon}</div>
+            <div style="font-size: 1.2em; font-weight: bold; color: {'#155724' if status_color == 'green' else '#0c5460' if status_color == 'blue' else '#856404'}; margin-bottom: 5px;">
+                {status_title}
+            </div>
+            <div style="font-size: 1.1em; color: {'#155724' if status_color == 'green' else '#0c5460' if status_color == 'blue' else '#856404'}; margin-bottom: 5px;">
+                Média: {format_currency(valor_medio)}
+            </div>
+            <div style="font-size: 0.9em; color: {'#155724' if status_color == 'green' else '#0c5460' if status_color == 'blue' else '#856404'}; margin-top: 5px;">
+                {status_message}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Gráficos de rosca "Top 5"
+    st.markdown("### Top 5 Receitas")
+    col_pie1, col_pie2, col_pie3 = st.columns(3)
+
     if not receitas.empty and "VALOR" in receitas.columns:
-        # Indicadores
-        total_receitas = receitas["VALOR"].sum()
-        num_receitas = len(receitas)
-        valor_medio = total_receitas / num_receitas if num_receitas > 0 else 0
+        # Top 5 por categoria
+        with col_pie1:
+            if 'CATEGORIA' in receitas.columns:
+                # Remove valores nulos ou vazios antes de agrupar
+                df_cat = receitas.dropna(subset=['CATEGORIA'])
+                df_cat = df_cat[df_cat['CATEGORIA'].str.strip() != '']
+                
+                if not df_cat.empty:
+                    top_categorias = df_cat.groupby('CATEGORIA')["VALOR"].sum().sort_values(ascending=False).head(5).reset_index()
+                    fig_categorias = charts_manager.create_pie_chart(
+                        top_categorias, "VALOR", 'CATEGORIA', "Top 5 Categorias", hole=0.5, showlegend=True
+                    )
+                    st.plotly_chart(fig_categorias, use_container_width=True)
         
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Receitas", format_currency(total_receitas))
-        with col2:
-            st.metric("Nº de Receitas", num_receitas)
-        with col3:
-            st.metric("Valor Médio", format_currency(valor_medio))
+        # Top 5 por descrição
+        with col_pie2:
+            if 'DESCRIÇÃO' in receitas.columns:
+                # Remove valores nulos ou vazios antes de agrupar
+                df_desc = receitas.dropna(subset=['DESCRIÇÃO'])
+                df_desc = df_desc[df_desc['DESCRIÇÃO'].str.strip() != '']
+                
+                if not df_desc.empty:
+                    top_descricoes = df_desc.groupby('DESCRIÇÃO')["VALOR"].sum().sort_values(ascending=False).head(5).reset_index()
+                    fig_descricoes = charts_manager.create_pie_chart(
+                        top_descricoes, "VALOR", 'DESCRIÇÃO', "Top 5 Descrições", hole=0.5, showlegend=True
+                    )
+                    st.plotly_chart(fig_descricoes, use_container_width=True)
         
-        # Gráficos
-        col1, col2 = st.columns(2)
-        with col1:
-            receitas_por_categoria = receitas.groupby("CATEGORIA")["VALOR"].sum().reset_index()
-            fig_categoria = charts_manager.create_pie_chart(
-                receitas_por_categoria, "VALOR", "CATEGORIA", "Receitas por Categoria"
-            )
-            st.plotly_chart(fig_categoria, use_container_width=True)
+        # Top 5 por forma de recebimento
+        with col_pie3:
+            if 'FORMA_RECEBIMENTO' in receitas.columns:
+                # Remove valores nulos ou vazios antes de agrupar
+                df_rec = receitas.dropna(subset=['FORMA_RECEBIMENTO'])
+                df_rec = df_rec[df_rec['FORMA_RECEBIMENTO'].str.strip() != '']
+                
+                if not df_rec.empty:
+                    top_recebimentos = df_rec.groupby('FORMA_RECEBIMENTO')["VALOR"].sum().sort_values(ascending=False).head(5).reset_index()
+                    fig_recebimentos = charts_manager.create_pie_chart(
+                        top_recebimentos, "VALOR", 'FORMA_RECEBIMENTO', "Top 5 Formas de Recebimento", hole=0.5, showlegend=True
+                    )
+                    st.plotly_chart(fig_recebimentos, use_container_width=True)
         
-        with col2:
-            if "FORMA_RECEBIMENTO" in receitas.columns:
-                receitas_por_recebimento = receitas.groupby("FORMA_RECEBIMENTO")["VALOR"].sum().reset_index()
-                fig_recebimento = charts_manager.create_pie_chart(
-                    receitas_por_recebimento, "VALOR", "FORMA_RECEBIMENTO", "Receitas por Forma de Recebimento"
-                )
-                st.plotly_chart(fig_recebimento, use_container_width=True)
-    
+        # Evolução temporal
+        if "DATA" in receitas.columns and not receitas.empty:
+            receitas_copy = receitas.copy()
+            receitas_copy["DATA"] = pd.to_datetime(receitas_copy["DATA"], errors='coerce')
+            receitas_copy = receitas_copy.dropna(subset=["DATA"])
+
+            if not receitas_copy.empty:
+                # Decide o período de agrupamento (diário vs. mensal)
+                date_range_days = (receitas_copy["DATA"].max() - receitas_copy["DATA"].min()).days
+                
+                if date_range_days <= 90:
+                    # Agrupamento diário para períodos curtos
+                    receitas_temporais = receitas_copy.groupby(receitas_copy["DATA"].dt.date)["VALOR"].sum().reset_index()
+                    x_axis_col = "DATA"
+                    chart_title = "Evolução Diária das Receitas"
+                else:
+                    # Agrupamento mensal para períodos longos
+                    receitas_copy["Mes"] = receitas_copy["DATA"].dt.strftime("%Y-%m")
+                    receitas_temporais = receitas_copy.groupby("Mes")["VALOR"].sum().sort_index().reset_index()
+                    x_axis_col = "Mes"
+                    chart_title = "Evolução Mensal das Receitas"
+                
+                # Garante que há pelo menos 2 pontos para desenhar uma linha
+                if len(receitas_temporais) > 1:
+                    fig_temporal = charts_manager.create_line_chart(
+                        receitas_temporais, x_axis_col, "VALOR", chart_title
+                    )
+                    st.plotly_chart(fig_temporal, use_container_width=True)
+                else:
+                    st.info("Não há dados suficientes no período selecionado para exibir a evolução temporal.")
+
+    # Tabela de transações (agora renderizada antes dos formulários)
     st.markdown("### 📋 Transações")
     if not receitas.empty:
-        receitas_display = receitas.copy()
-        if "DATA" in receitas_display.columns:
-            receitas_display["DATA"] = pd.to_datetime(receitas_display["DATA"], errors='coerce')
-            receitas_display["DATA"] = receitas_display["DATA"].dt.strftime("%d/%m/%Y")
-        if "VALOR" in receitas_display.columns:
-            receitas_display["VALOR"] = receitas_display["VALOR"].apply(format_currency)
-        st.dataframe(receitas_display, use_container_width=True)
+        receitas_crud = receitas.copy()
+        df_display = format_dataframe_for_display(receitas_crud, "Receitas")
+        create_editable_table(df_display, "Receitas", crud_system)
     else:
         st.info("Nenhuma receita encontrada para o período selecionado.")
 
-def show_credit_card(cc_data, filters):
+    st.divider()
+
+    # --- LÓGICA PARA EXIBIR FORMULÁRIOS (agora renderizada depois da tabela) ---
+    if st.session_state.get("show_revenue_form", False):
+        forms_manager.create_revenue_form()
+
+    if st.session_state.get("show_edit_Receitas", False):
+        forms_manager.render_edit_revenue_form(receitas, crud_system)
+
+    if st.session_state.get("show_delete_Receitas", False):
+        forms_manager.render_delete_revenue_form(receitas, crud_system)
+
+    if st.session_state.get("show_bulk_delete_Receitas", False):
+        forms_manager.render_bulk_delete_revenue_form(receitas, crud_system)
+
+def show_credit_card(cc_data, filters, crud_system, forms_manager):
     st.markdown("## 💳 Análise do Cartão de Crédito")
-    
-    # Botões CRUD
-    col_crud1, col_crud2, col_crud3, col_crud4 = st.columns(4)
-    with col_crud1:
+
+    # --- BOTÕES DE AÇÃO UNIFICADOS ---
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
         if st.button("➕ Nova Despesa CC", type="primary", use_container_width=True):
-            st.session_state.show_credit_card_form = True
-    with col_crud2:
+            st.session_state.show_credit_card_form = not st.session_state.get("show_credit_card_form", False)
+            st.session_state.show_edit_Div_CC = False
+            st.session_state.show_delete_Div_CC = False
+            st.session_state.show_bulk_delete_Div_CC = False
+    with col2:
         if st.button("✏️ Editar", use_container_width=True):
-            st.session_state.show_edit_Div_CC = True
-    with col_crud3:
+            st.session_state.show_edit_Div_CC = not st.session_state.get("show_edit_Div_CC", False)
+            st.session_state.show_credit_card_form = False
+            st.session_state.show_delete_Div_CC = False
+            st.session_state.show_bulk_delete_Div_CC = False
+    with col3:
         if st.button("🗑️ Excluir", use_container_width=True):
-            st.session_state.show_delete_Div_CC = True
-    with col_crud4:
-        if st.button("🗑️ Exclusão em Lote", use_container_width=True):
-            st.session_state.show_bulk_delete_Div_CC = True
+            st.session_state.show_delete_Div_CC = not st.session_state.get("show_delete_Div_CC", False)
+            st.session_state.show_credit_card_form = False
+            st.session_state.show_edit_Div_CC = False
+            st.session_state.show_bulk_delete_Div_CC = False
+    with col4:
+        if st.button("🗑️ Excl. em Lote", use_container_width=True):
+            st.session_state.show_bulk_delete_Div_CC = not st.session_state.get("show_bulk_delete_Div_CC", False)
+            st.session_state.show_credit_card_form = False
+            st.session_state.show_edit_Div_CC = False
+            st.session_state.show_delete_Div_CC = False
     
-    # Formulário de nova despesa no cartão
-    if st.session_state.get("show_credit_card_form", False):
-        with st.expander("💳 Nova Despesa no Cartão", expanded=True):
-            forms_manager.create_credit_card_form()
-            if st.button("❌ Fechar"):
-                st.session_state.show_credit_card_form = False
-                st.rerun()
+    st.divider()
+
+    # Métricas principais
+    col1, col2, col3, col4 = st.columns(4)
     
+    total_cc = cc_data["VALOR"].sum() if "VALOR" in cc_data.columns and not cc_data.empty else 0
+    num_transacoes = len(cc_data) if not cc_data.empty else 0
+    valor_medio = total_cc / num_transacoes if num_transacoes > 0 else 0
+    num_cartoes = cc_data["CARTAO"].nunique() if "CARTAO" in cc_data.columns and not cc_data.empty else 0
+    
+    with col1:
+        render_metric_card(
+            title="Total no Cartão",
+            value=format_currency(total_cc),
+            icon="💳"
+        )
+    with col2:
+        render_metric_card(
+            title="Nº de Transações",
+            value=str(num_transacoes),
+            icon="🔄"
+        )
+    with col3:
+        render_metric_card(
+            title="Valor Médio",
+            value=format_currency(valor_medio),
+            icon="📊"
+        )
+    with col4:
+        render_metric_card(
+            title="Nº de Cartões",
+            value=str(num_cartoes),
+            icon="💳"
+        )
+    
+    # Gráficos de rosca "Top 5"
+    st.markdown("### Top 5 Cartão de Crédito")
+    col_pie1, col_pie2, col_pie3 = st.columns(3)
+
     if not cc_data.empty and "VALOR" in cc_data.columns:
-        # Indicadores
-        total_cc = cc_data["VALOR"].sum()
-        num_transacoes = len(cc_data)
-        valor_medio = total_cc / num_transacoes if num_transacoes > 0 else 0
+        # Top 5 por categoria
+        with col_pie1:
+            if 'CATEGORIA' in cc_data.columns:
+                # Remove valores nulos ou vazios antes de agrupar
+                df_cat = cc_data.dropna(subset=['CATEGORIA'])
+                df_cat = df_cat[df_cat['CATEGORIA'].str.strip() != '']
+                
+                if not df_cat.empty:
+                    top_categorias = df_cat.groupby('CATEGORIA')["VALOR"].sum().sort_values(ascending=False).head(5).reset_index()
+                    fig_categorias = charts_manager.create_pie_chart(
+                        top_categorias, "VALOR", 'CATEGORIA', "Top 5 Categorias", hole=0.5, showlegend=True
+                    )
+                    st.plotly_chart(fig_categorias, use_container_width=True)
         
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total no Cartão", format_currency(total_cc))
-        with col2:
-            st.metric("Nº de Transações", num_transacoes)
-        with col3:
-            st.metric("Valor Médio", format_currency(valor_medio))
+        # Top 5 por descrição
+        with col_pie2:
+            if 'DESCRIÇÃO' in cc_data.columns:
+                # Remove valores nulos ou vazios antes de agrupar
+                df_desc = cc_data.dropna(subset=['DESCRIÇÃO'])
+                df_desc = df_desc[df_desc['DESCRIÇÃO'].str.strip() != '']
+                
+                if not df_desc.empty:
+                    top_descricoes = df_desc.groupby('DESCRIÇÃO')["VALOR"].sum().sort_values(ascending=False).head(5).reset_index()
+                    fig_descricoes = charts_manager.create_pie_chart(
+                        top_descricoes, "VALOR", 'DESCRIÇÃO', "Top 5 Descrições", hole=0.5, showlegend=True
+                    )
+                    st.plotly_chart(fig_descricoes, use_container_width=True)
         
-        # Gráficos
-        col1, col2 = st.columns(2)
-        with col1:
-            cc_por_categoria = cc_data.groupby("CATEGORIA")["VALOR"].sum().reset_index()
-            fig_categoria = charts_manager.create_pie_chart(
-                cc_por_categoria, "VALOR", "CATEGORIA", "Despesas no Cartão por Categoria"
-            )
-            st.plotly_chart(fig_categoria, use_container_width=True)
+        # Top 5 por cartão
+        with col_pie3:
+            if 'CARTAO' in cc_data.columns:
+                # Remove valores nulos ou vazios antes de agrupar
+                df_cartao = cc_data.dropna(subset=['CARTAO'])
+                df_cartao = df_cartao[df_cartao['CARTAO'].str.strip() != '']
+                
+                if not df_cartao.empty:
+                    top_cartoes = df_cartao.groupby('CARTAO')["VALOR"].sum().sort_values(ascending=False).head(5).reset_index()
+                    fig_cartoes = charts_manager.create_pie_chart(
+                        top_cartoes, "VALOR", 'CARTAO', "Top 5 Cartões", hole=0.5, showlegend=True
+                    )
+                    st.plotly_chart(fig_cartoes, use_container_width=True)
         
-        with col2:
-            if "CARTAO" in cc_data.columns:
-                cc_por_cartao = cc_data.groupby("CARTAO")["VALOR"].sum().reset_index()
-                fig_cartao = charts_manager.create_pie_chart(
-                    cc_por_cartao, "VALOR", "CARTAO", "Despesas por Cartão"
-                )
-                st.plotly_chart(fig_cartao, use_container_width=True)
-    
+        # Evolução temporal
+        if "DATA" in cc_data.columns and not cc_data.empty:
+            cc_copy = cc_data.copy()
+            cc_copy["DATA"] = pd.to_datetime(cc_copy["DATA"], errors='coerce')
+            cc_copy = cc_copy.dropna(subset=["DATA"])
+
+            if not cc_copy.empty:
+                # Decide o período de agrupamento (diário vs. mensal)
+                date_range_days = (cc_copy["DATA"].max() - cc_copy["DATA"].min()).days
+                
+                if date_range_days <= 90:
+                    # Agrupamento diário para períodos curtos
+                    cc_temporais = cc_copy.groupby(cc_copy["DATA"].dt.date)["VALOR"].sum().reset_index()
+                    x_axis_col = "DATA"
+                    chart_title = "Evolução Diária do Cartão"
+                else:
+                    # Agrupamento mensal para períodos longos
+                    cc_copy["Mes"] = cc_copy["DATA"].dt.strftime("%Y-%m")
+                    cc_temporais = cc_copy.groupby("Mes")["VALOR"].sum().sort_index().reset_index()
+                    x_axis_col = "Mes"
+                    chart_title = "Evolução Mensal do Cartão"
+                
+                # Garante que há pelo menos 2 pontos para desenhar uma linha
+                if len(cc_temporais) > 1:
+                    fig_temporal = charts_manager.create_line_chart(
+                        cc_temporais, x_axis_col, "VALOR", chart_title
+                    )
+                    st.plotly_chart(fig_temporal, use_container_width=True)
+                else:
+                    st.info("Não há dados suficientes no período selecionado para exibir a evolução temporal.")
+
+    # Tabela de transações (agora renderizada antes dos formulários)
     st.markdown("### 📋 Transações")
     if not cc_data.empty:
-        cc_display = cc_data.copy()
-        if "DATA" in cc_display.columns:
-            cc_display["DATA"] = pd.to_datetime(cc_display["DATA"], errors='coerce')
-            cc_display["DATA"] = cc_display["DATA"].dt.strftime("%d/%m/%Y")
-        if "VALOR" in cc_display.columns:
-            cc_display["VALOR"] = cc_display["VALOR"].apply(format_currency)
-        st.dataframe(cc_display, use_container_width=True)
+        cc_crud = cc_data.copy()
+        df_display = format_dataframe_for_display(cc_crud, "Div_CC")
+        create_editable_table(df_display, "Div_CC", crud_system)
     else:
         st.info("Nenhuma transação no cartão encontrada para o período selecionado.")
+
+    st.divider()
+
+    # --- LÓGICA PARA EXIBIR FORMULÁRIOS (agora renderizada depois da tabela) ---
+    if st.session_state.get("show_credit_card_form", False):
+        forms_manager.create_credit_card_form()
+
+    if st.session_state.get("show_edit_Div_CC", False):
+        forms_manager.render_edit_credit_card_form(cc_data, crud_system)
+
+    if st.session_state.get("show_delete_Div_CC", False):
+        forms_manager.render_delete_credit_card_form(cc_data, crud_system)
+
+    if st.session_state.get("show_bulk_delete_Div_CC", False):
+        forms_manager.render_bulk_delete_credit_card_form(cc_data, crud_system)
 
 def show_budget(receitas, despesas, orcamento, filters):
     st.markdown("## 📋 Análise do Orçamento")
     
     # Calcular renda líquida (receitas - despesas)
     renda_liquida = receitas["VALOR"].sum() if not receitas.empty and "VALOR" in receitas.columns else 0
+    total_gasto = despesas["VALOR"].sum() if not despesas.empty and "VALOR" in despesas.columns else 0
+    total_orcado = renda_liquida
+    saldo_orcamento = total_orcado - total_gasto
+    
+    # Determinar ícone e cor baseado no saldo
+    if saldo_orcamento >= 0:
+        saldo_icon = "✅"
+        saldo_title = "Saldo Positivo"
+        saldo_color = "green"
+    else:
+        saldo_icon = "⚠️"
+        saldo_title = "Saldo Negativo"
+        saldo_color = "red"
     
     # Métricas do orçamento
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("💰 Renda Líquida", format_currency(renda_liquida))
+        render_metric_card(
+            title="Renda Líquida",
+            value=format_currency(renda_liquida),
+            icon="💰"
+        )
     with col2:
-        total_gasto = despesas["VALOR"].sum() if not despesas.empty and "VALOR" in despesas.columns else 0
-        st.metric("💸 Total Gasto", format_currency(total_gasto))
+        render_metric_card(
+            title="Total Gasto",
+            value=format_currency(total_gasto),
+            icon="💸"
+        )
     with col3:
-        total_orcado = renda_liquida
-        st.metric("📊 Total Orçado", format_currency(total_orcado))
+        render_metric_card(
+            title="Total Orçado",
+            value=format_currency(total_orcado),
+            icon="📊"
+        )
+    with col4:
+        # Card personalizado para saldo
+        st.markdown(f"""
+        <div style="
+            background: linear-gradient(135deg, {'#d4edda' if saldo_orcamento >= 0 else '#f8d7da'}, {'#c3e6cb' if saldo_orcamento >= 0 else '#f5c6cb'});
+            border: 2px solid {'#28a745' if saldo_orcamento >= 0 else '#dc3545'};
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin: 10px 0;
+        ">
+            <div style="font-size: 2.5em; margin-bottom: 10px;">{saldo_icon}</div>
+            <div style="font-size: 1.2em; font-weight: bold; color: {'#155724' if saldo_orcamento >= 0 else '#721c24'}; margin-bottom: 5px;">
+                {saldo_title}
+            </div>
+            <div style="font-size: 1.5em; font-weight: bold; color: {'#155724' if saldo_orcamento >= 0 else '#721c24'};">
+                {format_currency(saldo_orcamento)}
+            </div>
+            <div style="font-size: 0.9em; color: {'#155724' if saldo_orcamento >= 0 else '#721c24'}; margin-top: 5px;">
+                {'Dentro do orçamento! 🎉' if saldo_orcamento >= 0 else 'Acima do orçamento! 📈'}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
     
     # Gráficos
     col1, col2 = st.columns(2)
@@ -519,30 +862,38 @@ def show_budget(receitas, despesas, orcamento, filters):
         orcamento_por_categoria = orcamento.copy()
         orcamento_por_categoria["Valor_Orcado"] = (orcamento_por_categoria["Percentual"] / 100) * renda_liquida
         fig_orcado = charts_manager.create_pie_chart(
-            orcamento_por_categoria, "Valor_Orcado", "CATEGORIA", "Distribuição Orçada por Categoria"
+            orcamento_por_categoria, "Valor_Orcado", "Categoria", "Distribuição Orçada por Categoria"
         )
         st.plotly_chart(fig_orcado, use_container_width=True)
     with col2:
         if not despesas.empty and "VALOR" in despesas.columns:
-            despesas_por_categoria = despesas.groupby("CATEGORIA")["VALOR"].sum().reset_index()
-            fig_real = charts_manager.create_pie_chart(
-                despesas_por_categoria, "VALOR", "CATEGORIA", "Distribuição Real dos Gastos"
-            )
-            st.plotly_chart(fig_real, use_container_width=True)
+            despesas_por_categoria = despesas.groupby("CATEGORIA")["VALOR"].sum().abs().reset_index()
+            
+            # Garante que há dados para plotar
+            if not despesas_por_categoria.empty and despesas_por_categoria["VALOR"].sum() > 0:
+                fig_real = charts_manager.create_pie_chart(
+                    despesas_por_categoria, "VALOR", "CATEGORIA", "Distribuição Real dos Gastos"
+                )
+                st.plotly_chart(fig_real, use_container_width=True)
+            else:
+                st.info("Nenhum dado de gasto real para exibir no período selecionado.")
+        else:
+            st.info("Nenhum dado de gasto real para exibir no período selecionado.")
     
     # Comparativo
     if not despesas.empty and "VALOR" in despesas.columns:
         st.markdown("### 📊 Comparativo Orçado vs. Gasto")
         comparativo = orcamento.copy()
         comparativo["Valor_Orcado"] = (comparativo["Percentual"] / 100) * renda_liquida
-        despesas_por_categoria = despesas.groupby("CATEGORIA")["VALOR"].sum()
-        comparativo["Valor_Gasto"] = comparativo["CATEGORIA"].map(despesas_por_categoria).fillna(0)
+        despesas_por_categoria = despesas.groupby("CATEGORIA")["VALOR"].sum().abs()
+        comparativo["Valor_Gasto"] = comparativo["Categoria"].map(despesas_por_categoria).fillna(0)
         comparativo["Saldo"] = comparativo["Valor_Orcado"] - comparativo["Valor_Gasto"]
-        comparativo["Percentual_Uso"] = (comparativo["Valor_Gasto"] / comparativo["Valor_Orcado"]) * 100
-        comparativo["Percentual_Uso"] = comparativo["Percentual_Uso"].fillna(0)
         
+        # Divisão segura para Series, tratando divisão por zero (que resulta em infinito) e NaN.
+        comparativo["Percentual_Uso"] = (comparativo["Valor_Gasto"] / comparativo["Valor_Orcado"] * 100).replace([np.inf, -np.inf], 0).fillna(0)
+
         fig_comparativo = charts_manager.create_comparison_chart(
-            comparativo, "CATEGORIA", ["Valor_Orcado", "Valor_Gasto"], "Comparativo Orçado vs. Gasto por Categoria"
+            comparativo, "Categoria", ["Valor_Orcado", "Valor_Gasto"], "Comparativo Orçado vs. Gasto por Categoria"
         )
         st.plotly_chart(fig_comparativo, use_container_width=True)
         
@@ -555,142 +906,445 @@ def show_budget(receitas, despesas, orcamento, filters):
         acompanhamento["Percentual"] = acompanhamento["Percentual"].apply(format_percentage)
         st.dataframe(acompanhamento, use_container_width=True)
 
-def show_sales(vendas, filters):
+def show_sales(vendas, filters, crud_system, forms_manager):
     st.markdown("## 🛒 Análise de Vendas")
-    
-    # Botões CRUD
-    col_crud1, col_crud2, col_crud3, col_crud4 = st.columns(4)
-    with col_crud1:
+
+    # --- BOTÕES DE AÇÃO UNIFICADOS ---
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
         if st.button("➕ Nova Venda", type="primary", use_container_width=True):
-            st.session_state.show_sale_form = True
-    with col_crud2:
+            st.session_state.show_sale_form = not st.session_state.get("show_sale_form", False)
+            st.session_state.show_edit_Vendas = False
+            st.session_state.show_delete_Vendas = False
+            st.session_state.show_bulk_delete_Vendas = False
+    with col2:
         if st.button("✏️ Editar", use_container_width=True):
-            st.session_state.show_edit_Vendas = True
-    with col_crud3:
+            st.session_state.show_edit_Vendas = not st.session_state.get("show_edit_Vendas", False)
+            st.session_state.show_sale_form = False
+            st.session_state.show_delete_Vendas = False
+            st.session_state.show_bulk_delete_Vendas = False
+    with col3:
         if st.button("🗑️ Excluir", use_container_width=True):
-            st.session_state.show_delete_Vendas = True
-    with col_crud4:
-        if st.button("🗑️ Exclusão em Lote", use_container_width=True):
-            st.session_state.show_bulk_delete_Vendas = True
+            st.session_state.show_delete_Vendas = not st.session_state.get("show_delete_Vendas", False)
+            st.session_state.show_sale_form = False
+            st.session_state.show_edit_Vendas = False
+            st.session_state.show_bulk_delete_Vendas = False
+    with col4:
+        if st.button("🗑️ Excl. em Lote", use_container_width=True):
+            st.session_state.show_bulk_delete_Vendas = not st.session_state.get("show_bulk_delete_Vendas", False)
+            st.session_state.show_sale_form = False
+            st.session_state.show_edit_Vendas = False
+            st.session_state.show_delete_Vendas = False
     
-    # Formulário de nova venda
-    if st.session_state.get("show_sale_form", False):
-        with st.expander("🛒 Nova Venda", expanded=True):
-            forms_manager.create_sale_form()
-            if st.button("❌ Fechar"):
-                st.session_state.show_sale_form = False
-                st.rerun()
+    st.divider()
+
+    # Métricas principais
+    col1, col2, col3, col4 = st.columns(4)
     
-    if not vendas.empty and "VALOR" in vendas.columns:
-        # Indicadores
-        total_vendido = vendas["VALOR"].sum()
-        num_vendas = len(vendas)
-        ticket_medio = total_vendido / num_vendas if num_vendas > 0 else 0
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Vendido", format_currency(total_vendido))
-        with col2:
-            st.metric("Nº de Vendas", num_vendas)
-        with col3:
-            st.metric("Ticket Médio", format_currency(ticket_medio))
-        
-        st.markdown("### 📊 Resumo por Cliente")
-        vendas_por_cliente = vendas.groupby("Cliente").agg({"VALOR": ["sum", "count", "mean"]}).round(2)
-        vendas_por_cliente.columns = ["Total", "Quantidade", "Média"]
-        vendas_por_cliente = vendas_por_cliente.sort_values("Total", ascending=False)
-        vendas_por_cliente["Total"] = vendas_por_cliente["Total"].apply(format_currency)
-        vendas_por_cliente["Média"] = vendas_por_cliente["Média"].apply(format_currency)
-        st.dataframe(vendas_por_cliente, use_container_width=True)
-        
-        # Gráfico de pizza
-        fig_pizza = charts_manager.create_pie_chart(
-            vendas.groupby("Cliente")["VALOR"].sum().reset_index(), 
-            "VALOR", "Cliente", "Vendas por Cliente"
+    total_vendido = vendas["VALOR"].sum() if "VALOR" in vendas.columns and not vendas.empty else 0
+    num_vendas = len(vendas) if not vendas.empty else 0
+    ticket_medio = total_vendido / num_vendas if num_vendas > 0 else 0
+    num_clientes = vendas["Cliente"].nunique() if "Cliente" in vendas.columns and not vendas.empty else 0
+    
+    # Determinar se vendas estão boas (baseado no ticket médio)
+    if ticket_medio >= 2000:  # Limite arbitrário para "excelentes vendas"
+        status_icon = "🏆"
+        status_title = "Vendas Excelentes"
+        status_color = "green"
+        status_message = "Desempenho incrível! 🎉"
+    elif ticket_medio >= 1000:
+        status_icon = "📈"
+        status_title = "Vendas Boas"
+        status_color = "blue"
+        status_message = "Continue crescendo! 💪"
+    else:
+        status_icon = "💡"
+        status_title = "Vendas Baixas"
+        status_color = "orange"
+        status_message = "Foque no ticket médio! 📊"
+    
+    with col1:
+        render_metric_card(
+            title="Total Vendido",
+            value=format_currency(total_vendido),
+            icon="💰"
         )
-        st.plotly_chart(fig_pizza, use_container_width=True)
-    
+    with col2:
+        render_metric_card(
+            title="Nº de Vendas",
+            value=str(num_vendas),
+            icon="🛒"
+        )
+    with col3:
+        render_metric_card(
+            title="Ticket Médio",
+            value=format_currency(ticket_medio),
+            icon="📊"
+        )
+    with col4:
+        # Card personalizado para status das vendas
+        st.markdown(f"""
+        <div style="
+            background: linear-gradient(135deg, {'#d4edda' if status_color == 'green' else '#d1ecf1' if status_color == 'blue' else '#fff3cd'}, {'#c3e6cb' if status_color == 'green' else '#bee5eb' if status_color == 'blue' else '#ffeaa7'});
+            border: 2px solid {'#28a745' if status_color == 'green' else '#17a2b8' if status_color == 'blue' else '#ffc107'};
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin: 10px 0;
+        ">
+            <div style="font-size: 2.5em; margin-bottom: 10px;">{status_icon}</div>
+            <div style="font-size: 1.2em; font-weight: bold; color: {'#155724' if status_color == 'green' else '#0c5460' if status_color == 'blue' else '#856404'}; margin-bottom: 5px;">
+                {status_title}
+            </div>
+            <div style="font-size: 1.1em; color: {'#155724' if status_color == 'green' else '#0c5460' if status_color == 'blue' else '#856404'}; margin-bottom: 5px;">
+                Ticket: {format_currency(ticket_medio)}
+            </div>
+            <div style="font-size: 0.9em; color: {'#155724' if status_color == 'green' else '#0c5460' if status_color == 'blue' else '#856404'}; margin-top: 5px;">
+                {status_message}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Gráficos de rosca "Top 5"
+    st.markdown("### Top 5 Vendas")
+    col_pie1, col_pie2, col_pie3 = st.columns(3)
+
+    if not vendas.empty and "VALOR" in vendas.columns:
+        # Top 5 por cliente
+        with col_pie1:
+            if 'Cliente' in vendas.columns:
+                # Remove valores nulos ou vazios antes de agrupar
+                df_cliente = vendas.dropna(subset=['Cliente'])
+                df_cliente = df_cliente[df_cliente['Cliente'].str.strip() != '']
+                
+                if not df_cliente.empty:
+                    top_clientes = df_cliente.groupby('Cliente')["VALOR"].sum().sort_values(ascending=False).head(5).reset_index()
+                    fig_clientes = charts_manager.create_pie_chart(
+                        top_clientes, "VALOR", 'Cliente', "Top 5 Clientes", hole=0.5, showlegend=True
+                    )
+                    st.plotly_chart(fig_clientes, use_container_width=True)
+        
+        # Top 5 por produto
+        with col_pie2:
+            if 'Produto' in vendas.columns:
+                # Remove valores nulos ou vazios antes de agrupar
+                df_produto = vendas.dropna(subset=['Produto'])
+                df_produto = df_produto[df_produto['Produto'].str.strip() != '']
+                
+                if not df_produto.empty:
+                    top_produtos = df_produto.groupby('Produto')["VALOR"].sum().sort_values(ascending=False).head(5).reset_index()
+                    fig_produtos = charts_manager.create_pie_chart(
+                        top_produtos, "VALOR", 'Produto', "Top 5 Produtos", hole=0.5, showlegend=True
+                    )
+                    st.plotly_chart(fig_produtos, use_container_width=True)
+        
+        # Top 5 por forma de pagamento
+        with col_pie3:
+            if 'Forma_Pagamento' in vendas.columns:
+                # Remove valores nulos ou vazios antes de agrupar
+                df_pagamento = vendas.dropna(subset=['Forma_Pagamento'])
+                df_pagamento = df_pagamento[df_pagamento['Forma_Pagamento'].str.strip() != '']
+                
+                if not df_pagamento.empty:
+                    top_pagamentos = df_pagamento.groupby('Forma_Pagamento')["VALOR"].sum().sort_values(ascending=False).head(5).reset_index()
+                    fig_pagamentos = charts_manager.create_pie_chart(
+                        top_pagamentos, "VALOR", 'Forma_Pagamento', "Top 5 Formas de Pagamento", hole=0.5, showlegend=True
+                    )
+                    st.plotly_chart(fig_pagamentos, use_container_width=True)
+        
+        # Evolução temporal
+        if "DATA" in vendas.columns and not vendas.empty:
+            vendas_copy = vendas.copy()
+            vendas_copy["DATA"] = pd.to_datetime(vendas_copy["DATA"], errors='coerce')
+            vendas_copy = vendas_copy.dropna(subset=["DATA"])
+
+            if not vendas_copy.empty:
+                # Decide o período de agrupamento (diário vs. mensal)
+                date_range_days = (vendas_copy["DATA"].max() - vendas_copy["DATA"].min()).days
+                
+                if date_range_days <= 90:
+                    # Agrupamento diário para períodos curtos
+                    vendas_temporais = vendas_copy.groupby(vendas_copy["DATA"].dt.date)["VALOR"].sum().reset_index()
+                    x_axis_col = "DATA"
+                    chart_title = "Evolução Diária das Vendas"
+                else:
+                    # Agrupamento mensal para períodos longos
+                    vendas_copy["Mes"] = vendas_copy["DATA"].dt.strftime("%Y-%m")
+                    vendas_temporais = vendas_copy.groupby("Mes")["VALOR"].sum().sort_index().reset_index()
+                    x_axis_col = "Mes"
+                    chart_title = "Evolução Mensal das Vendas"
+                
+                # Garante que há pelo menos 2 pontos para desenhar uma linha
+                if len(vendas_temporais) > 1:
+                    fig_temporal = charts_manager.create_line_chart(
+                        vendas_temporais, x_axis_col, "VALOR", chart_title
+                    )
+                    st.plotly_chart(fig_temporal, use_container_width=True)
+                else:
+                    st.info("Não há dados suficientes no período selecionado para exibir a evolução temporal.")
+
+    # Tabela de transações (agora renderizada antes dos formulários)
     st.markdown("### 📋 Transações")
     if not vendas.empty:
-        vendas_display = vendas.copy()
-        if "DATA" in vendas_display.columns:
-            vendas_display["DATA"] = pd.to_datetime(vendas_display["DATA"], errors='coerce')
-            vendas_display["DATA"] = vendas_display["DATA"].dt.strftime("%d/%m/%Y")
-        if "VALOR" in vendas_display.columns:
-            vendas_display["VALOR"] = vendas_display["VALOR"].apply(format_currency)
-        st.dataframe(vendas_display, use_container_width=True)
+        vendas_crud = vendas.copy()
+        df_display = format_dataframe_for_display(vendas_crud, "Vendas")
+        create_editable_table(df_display, "Vendas", crud_system)
     else:
         st.info("Nenhuma venda encontrada para o período selecionado.")
 
-def show_investments(investimentos, filters):
+    st.divider()
+
+    # --- LÓGICA PARA EXIBIR FORMULÁRIOS (agora renderizada depois da tabela) ---
+    if st.session_state.get("show_sale_form", False):
+        forms_manager.create_sale_form()
+
+    if st.session_state.get("show_edit_Vendas", False):
+        forms_manager.render_edit_sale_form(vendas, crud_system)
+
+    if st.session_state.get("show_delete_Vendas", False):
+        forms_manager.render_delete_sale_form(vendas, crud_system)
+
+    if st.session_state.get("show_bulk_delete_Vendas", False):
+        forms_manager.render_bulk_delete_sale_form(vendas, crud_system)
+
+def show_investments(investimentos, filters, crud_system, forms_manager):
     st.markdown("## 💰 Análise de Investimentos")
-    
-    # Botões CRUD
-    col_crud1, col_crud2, col_crud3, col_crud4 = st.columns(4)
-    with col_crud1:
+
+    # --- BOTÕES DE AÇÃO UNIFICADOS ---
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
         if st.button("➕ Novo Investimento", type="primary", use_container_width=True):
-            st.session_state.show_investment_form = True
-    with col_crud2:
+            st.session_state.show_investment_form = not st.session_state.get("show_investment_form", False)
+            st.session_state.show_edit_Investimentos = False
+            st.session_state.show_delete_Investimentos = False
+            st.session_state.show_bulk_delete_Investimentos = False
+    with col2:
         if st.button("✏️ Editar", use_container_width=True):
-            st.session_state.show_edit_Investimentos = True
-    with col_crud3:
+            st.session_state.show_edit_Investimentos = not st.session_state.get("show_edit_Investimentos", False)
+            st.session_state.show_investment_form = False
+            st.session_state.show_delete_Investimentos = False
+            st.session_state.show_bulk_delete_Investimentos = False
+    with col3:
         if st.button("🗑️ Excluir", use_container_width=True):
-            st.session_state.show_delete_Investimentos = True
-    with col_crud4:
-        if st.button("🗑️ Exclusão em Lote", use_container_width=True):
-            st.session_state.show_bulk_delete_Investimentos = True
+            st.session_state.show_delete_Investimentos = not st.session_state.get("show_delete_Investimentos", False)
+            st.session_state.show_investment_form = False
+            st.session_state.show_edit_Investimentos = False
+            st.session_state.show_bulk_delete_Investimentos = False
+    with col4:
+        if st.button("🗑️ Excl. em Lote", use_container_width=True):
+            st.session_state.show_bulk_delete_Investimentos = not st.session_state.get("show_bulk_delete_Investimentos", False)
+            st.session_state.show_investment_form = False
+            st.session_state.show_edit_Investimentos = False
+            st.session_state.show_delete_Investimentos = False
     
-    # Formulário de novo investimento
-    if st.session_state.get("show_investment_form", False):
-        with st.expander("💰 Novo Investimento", expanded=True):
-            forms_manager.create_investment_form()
-            if st.button("❌ Fechar"):
-                st.session_state.show_investment_form = False
-                st.rerun()
+    st.divider()
+
+    # Métricas principais
+    col1, col2, col3, col4 = st.columns(4)
     
-    if not investimentos.empty and "VALOR_APORTE" in investimentos.columns:
-        # Indicadores
-        total_investido = investimentos["VALOR_APORTE"].sum()
-        num_aportes = len(investimentos)
-        valor_medio_aporte = total_investido / num_aportes if num_aportes > 0 else 0
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Investido", format_currency(total_investido))
-        with col2:
-            st.metric("Nº de Aportes", num_aportes)
-        with col3:
-            st.metric("Valor Médio", format_currency(valor_medio_aporte))
-        
-        st.markdown("### 📊 Resumo por Ativo")
-        investimentos_por_ativo = investimentos.groupby("ATIVO").agg({"VALOR_APORTE": ["sum", "count", "mean"]}).round(2)
-        investimentos_por_ativo.columns = ["Total", "Quantidade", "Média"]
-        investimentos_por_ativo = investimentos_por_ativo.sort_values("Total", ascending=False)
-        investimentos_por_ativo["Total"] = investimentos_por_ativo["Total"].apply(format_currency)
-        investimentos_por_ativo["Média"] = investimentos_por_ativo["Média"].apply(format_currency)
-        st.dataframe(investimentos_por_ativo, use_container_width=True)
-        
-        # Gráfico de pizza
-        fig_pizza = charts_manager.create_pie_chart(
-            investimentos.groupby("ATIVO")["VALOR_APORTE"].sum().reset_index(), 
-            "VALOR_APORTE", "ATIVO", "Investimentos por Ativo"
+    total_investido = investimentos["VALOR_APORTE"].sum() if "VALOR_APORTE" in investimentos.columns and not investimentos.empty else 0
+    num_aportes = len(investimentos) if not investimentos.empty else 0
+    valor_medio_aporte = total_investido / num_aportes if num_aportes > 0 else 0
+    num_ativos = investimentos["ATIVO"].nunique() if "ATIVO" in investimentos.columns and not investimentos.empty else 0
+    
+    # Determinar se investimentos estão diversificados
+    if num_ativos >= 5:  # Limite arbitrário para "diversificado"
+        status_icon = "🌱"
+        status_title = "Portfólio Diversificado"
+        status_color = "green"
+        status_message = "Excelente diversificação! 🎯"
+    elif num_ativos >= 3:
+        status_icon = "📊"
+        status_title = "Portfólio Moderado"
+        status_color = "blue"
+        status_message = "Boa diversificação! 👍"
+    else:
+        status_icon = "⚠️"
+        status_title = "Portfólio Concentrado"
+        status_color = "orange"
+        status_message = "Considere diversificar! 💡"
+    
+    with col1:
+        render_metric_card(
+            title="Total Investido",
+            value=format_currency(total_investido),
+            icon="💰"
         )
-        st.plotly_chart(fig_pizza, use_container_width=True)
-    
+    with col2:
+        render_metric_card(
+            title="Nº de Aportes",
+            value=str(num_aportes),
+            icon="📈"
+        )
+    with col3:
+        render_metric_card(
+            title="Valor Médio",
+            value=format_currency(valor_medio_aporte),
+            icon="📊"
+        )
+    with col4:
+        # Card personalizado para status dos investimentos
+        st.markdown(f"""
+        <div style="
+            background: linear-gradient(135deg, {'#d4edda' if status_color == 'green' else '#d1ecf1' if status_color == 'blue' else '#fff3cd'}, {'#c3e6cb' if status_color == 'green' else '#bee5eb' if status_color == 'blue' else '#ffeaa7'});
+            border: 2px solid {'#28a745' if status_color == 'green' else '#17a2b8' if status_color == 'blue' else '#ffc107'};
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin: 10px 0;
+        ">
+            <div style="font-size: 2.5em; margin-bottom: 10px;">{status_icon}</div>
+            <div style="font-size: 1.2em; font-weight: bold; color: {'#155724' if status_color == 'green' else '#0c5460' if status_color == 'blue' else '#856404'}; margin-bottom: 5px;">
+                {status_title}
+            </div>
+            <div style="font-size: 1.1em; color: {'#155724' if status_color == 'green' else '#0c5460' if status_color == 'blue' else '#856404'}; margin-bottom: 5px;">
+                {num_ativos} ativos
+            </div>
+            <div style="font-size: 0.9em; color: {'#155724' if status_color == 'green' else '#0c5460' if status_color == 'blue' else '#856404'}; margin-top: 5px;">
+                {status_message}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Gráficos de rosca "Top 5"
+    st.markdown("### Top 5 Investimentos")
+    col_pie1, col_pie2, col_pie3 = st.columns(3)
+
+    if not investimentos.empty and "VALOR_APORTE" in investimentos.columns:
+        # Top 5 por ativo
+        with col_pie1:
+            if 'ATIVO' in investimentos.columns:
+                # Remove valores nulos ou vazios antes de agrupar
+                df_ativo = investimentos.dropna(subset=['ATIVO'])
+                df_ativo = df_ativo[df_ativo['ATIVO'].str.strip() != '']
+                
+                if not df_ativo.empty:
+                    top_ativos = df_ativo.groupby('ATIVO')["VALOR_APORTE"].sum().sort_values(ascending=False).head(5).reset_index()
+                    fig_ativos = charts_manager.create_pie_chart(
+                        top_ativos, "VALOR_APORTE", 'ATIVO', "Top 5 Ativos", hole=0.5, showlegend=True
+                    )
+                    st.plotly_chart(fig_ativos, use_container_width=True)
+        
+        # Top 5 por tipo de investimento
+        with col_pie2:
+            if 'TIPO_INVESTIMENTO' in investimentos.columns:
+                # Remove valores nulos ou vazios antes de agrupar
+                df_tipo = investimentos.dropna(subset=['TIPO_INVESTIMENTO'])
+                df_tipo = df_tipo[df_tipo['TIPO_INVESTIMENTO'].str.strip() != '']
+                
+                if not df_tipo.empty:
+                    top_tipos = df_tipo.groupby('TIPO_INVESTIMENTO')["VALOR_APORTE"].sum().sort_values(ascending=False).head(5).reset_index()
+                    fig_tipos = charts_manager.create_pie_chart(
+                        top_tipos, "VALOR_APORTE", 'TIPO_INVESTIMENTO', "Top 5 Tipos", hole=0.5, showlegend=True
+                    )
+                    st.plotly_chart(fig_tipos, use_container_width=True)
+        
+        # Top 5 por observações (se houver dados significativos)
+        with col_pie3:
+            if 'OBSERVACOES' in investimentos.columns:
+                # Remove valores nulos ou vazios antes de agrupar
+                df_obs = investimentos.dropna(subset=['OBSERVACOES'])
+                df_obs = df_obs[df_obs['OBSERVACOES'].str.strip() != '']
+                
+                if not df_obs.empty and len(df_obs['OBSERVACOES'].unique()) > 1:
+                    top_obs = df_obs.groupby('OBSERVACOES')["VALOR_APORTE"].sum().sort_values(ascending=False).head(5).reset_index()
+                    fig_obs = charts_manager.create_pie_chart(
+                        top_obs, "VALOR_APORTE", 'OBSERVACOES', "Top 5 Observações", hole=0.5, showlegend=True
+                    )
+                    st.plotly_chart(fig_obs, use_container_width=True)
+        
+        # Evolução temporal
+        if "DATA" in investimentos.columns and not investimentos.empty:
+            inv_copy = investimentos.copy()
+            inv_copy["DATA"] = pd.to_datetime(inv_copy["DATA"], errors='coerce')
+            inv_copy = inv_copy.dropna(subset=["DATA"])
+
+            if not inv_copy.empty:
+                # Decide o período de agrupamento (diário vs. mensal)
+                date_range_days = (inv_copy["DATA"].max() - inv_copy["DATA"].min()).days
+                
+                if date_range_days <= 90:
+                    # Agrupamento diário para períodos curtos
+                    inv_temporais = inv_copy.groupby(inv_copy["DATA"].dt.date)["VALOR_APORTE"].sum().reset_index()
+                    x_axis_col = "DATA"
+                    chart_title = "Evolução Diária dos Investimentos"
+                else:
+                    # Agrupamento mensal para períodos longos
+                    inv_copy["Mes"] = inv_copy["DATA"].dt.strftime("%Y-%m")
+                    inv_temporais = inv_copy.groupby("Mes")["VALOR_APORTE"].sum().sort_index().reset_index()
+                    x_axis_col = "Mes"
+                    chart_title = "Evolução Mensal dos Investimentos"
+                
+                # Garante que há pelo menos 2 pontos para desenhar uma linha
+                if len(inv_temporais) > 1:
+                    fig_temporal = charts_manager.create_line_chart(
+                        inv_temporais, x_axis_col, "VALOR_APORTE", chart_title
+                    )
+                    st.plotly_chart(fig_temporal, use_container_width=True)
+                else:
+                    st.info("Não há dados suficientes no período selecionado para exibir a evolução temporal.")
+
+    # Tabela de transações (agora renderizada antes dos formulários)
     st.markdown("### 📋 Transações")
     if not investimentos.empty:
-        investimentos_display = investimentos.copy()
-        if "DATA" in investimentos_display.columns:
-            investimentos_display["DATA"] = pd.to_datetime(investimentos_display["DATA"], errors='coerce')
-            investimentos_display["DATA"] = investimentos_display["DATA"].dt.strftime("%d/%m/%Y")
-        if "VALOR_APORTE" in investimentos_display.columns:
-            investimentos_display["VALOR_APORTE"] = investimentos_display["VALOR_APORTE"].apply(format_currency)
-        st.dataframe(investimentos_display, use_container_width=True)
+        inv_crud = investimentos.copy()
+        df_display = format_dataframe_for_display(inv_crud, "Investimentos")
+        create_editable_table(df_display, "Investimentos", crud_system)
     else:
         st.info("Nenhum investimento encontrado para o período selecionado.")
 
+    st.divider()
+
+    # --- LÓGICA PARA EXIBIR FORMULÁRIOS (agora renderizada depois da tabela) ---
+    if st.session_state.get("show_investment_form", False):
+        forms_manager.create_investment_form()
+
+    if st.session_state.get("show_edit_Investimentos", False):
+        forms_manager.render_edit_investment_form(investimentos, crud_system)
+
+    if st.session_state.get("show_delete_Investimentos", False):
+        forms_manager.render_delete_investment_form(investimentos, crud_system)
+
+    if st.session_state.get("show_bulk_delete_Investimentos", False):
+        forms_manager.render_bulk_delete_investment_form(investimentos, crud_system)
+
 def show_analytics(receitas, despesas, filters):
     st.markdown("## 📈 Análises Avançadas")
+    
+    # Métricas principais
+    col1, col2, col3, col4 = st.columns(4)
+    
+    total_receitas = receitas["VALOR"].sum() if "VALOR" in receitas.columns and not receitas.empty else 0
+    total_despesas = despesas["VALOR"].sum() if "VALOR" in despesas.columns and not despesas.empty else 0
+    saldo = total_receitas + total_despesas
+    percentual_despesas = (abs(total_despesas) / total_receitas) * 100 if total_receitas > 0 else 0
+    
+    with col1:
+        render_metric_card(
+            title="Total Receitas",
+            value=format_currency(total_receitas),
+            icon="💰"
+        )
+    with col2:
+        render_metric_card(
+            title="Total Despesas",
+            value=format_currency(total_despesas),
+            icon="💸"
+        )
+    with col3:
+        render_metric_card(
+            title="Saldo",
+            value=format_currency(saldo),
+            icon="💵"
+        )
+    with col4:
+        render_metric_card(
+            title="% Desp./Rec.",
+            value=f"{percentual_despesas:.1f}%",
+            icon="📊"
+        )
     
     st.markdown("### 📅 Análise Temporal")
     if not despesas.empty and "VALOR" in despesas.columns and "DATA" in despesas.columns:

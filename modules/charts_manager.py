@@ -14,7 +14,7 @@ class ChartsManager:
     def __init__(self):
         self.colors = px.colors.qualitative.Set3
     
-    def create_pie_chart(self, data, values_col, names_col, title, height=400, hole=0, color_sequence=None, showlegend=True):
+    def create_pie_chart(self, data, values_col, names_col, title, height=400, hole: float = 0.5, color_sequence=None, showlegend=True):
         """Gráfico de rosca/pizza customizado com rótulos externos e cores suaves."""
         if data.empty:
             return go.Figure().add_annotation(text="Sem dados para exibir", x=0.5, y=0.5, showarrow=False)
