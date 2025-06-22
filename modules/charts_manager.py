@@ -15,16 +15,14 @@ class ChartsManager:
         self.colors = px.colors.qualitative.Set3
     
     def create_pie_chart(self, data, values_col, names_col, title, height=400, hole=0, color_sequence=None, showlegend=True):
-        """Gráfico de rosca/pizza customizado para despesas"""
+        """Gráfico de rosca/pizza customizado com rótulos externos e cores suaves."""
         if data.empty:
             return go.Figure().add_annotation(text="Sem dados para exibir", x=0.5, y=0.5, showarrow=False)
-        # Tons de vermelho do mais escuro ao mais claro, com fallback para tons de cinza se tema for claro
+
+        # Usa uma paleta de cores 'Pastel' para um visual mais suave, por padrão.
         if color_sequence is None:
-            theme = st.get_option("theme.base")
-            if theme == "light":
-                color_sequence = ["#8B0000", "#B22222", "#CD5C5C", "#E9967A", "#F5B7B1"]
-            else:
-                color_sequence = ["#7f0000", "#b71c1c", "#d32f2f", "#e57373", "#ffcdd2"]
+            color_sequence = px.colors.qualitative.Pastel
+        
         fig = px.pie(
             data,
             values=values_col,
@@ -34,14 +32,12 @@ class ChartsManager:
             color_discrete_sequence=color_sequence,
             hole=hole
         )
-        # Apenas porcentagem, fonte grande e negrito
+        # Rótulos de porcentagem para fora, com fonte mais leve
         fig.update_traces(
-            textposition='inside',
+            textposition='outside',
             textinfo='percent',
-            textfont_size=22,
-            textfont_color='white',
-            textfont_family='Arial Black',
-            textfont=dict(family='Arial Black', size=22, color='white'),
+            textfont_size=16,
+            textfont_family='Arial',
             pull=0.03
         )
         # Título centralizado, grande e negrito
@@ -50,13 +46,13 @@ class ChartsManager:
                 text=f"<b>{title}</b>",
                 x=0.5,
                 xanchor='center',
-                font=dict(size=22, family='Arial Black', color=color_sequence[0])
+                font=dict(size=22, family='Arial Black') # Cor se adapta ao tema
             ),
             showlegend=showlegend,
-            legend=dict(orientation="h", yanchor="bottom", y=-0.7, xanchor="center", x=0.5, font=dict(size=15, family='Arial Black')),
+            legend=dict(orientation="h", yanchor="bottom", y=-0.7, xanchor="center", x=0.5, font=dict(size=15)),
             uniformtext_minsize=10,
             uniformtext_mode='hide',
-            margin=dict(t=60, b=120, l=0, r=0),
+            margin=dict(t=60, b=120, l=40, r=40), # Adiciona margem lateral para os rótulos
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)'
         )

@@ -15,8 +15,9 @@ warnings.filterwarnings('ignore')
 from modules.data_manager import data_manager
 from modules.filters_manager import filters_manager
 from modules.charts_manager import charts_manager
-from modules.forms_manager import FormsManager
-from utils.formatters import format_currency, format_percentage, get_delta_html, safe_divide
+from modules.forms_manager import forms_manager
+from utils.formatters import format_currency, format_percentage, safe_divide
+from utils.metrics_manager import render_metric_card
 
 # Importar sistemas CRUD e Backup
 from crud_system import CRUDSystem, create_editable_table, format_dataframe_for_display
@@ -164,7 +165,7 @@ def main():
     if selected == "📊 Visão Geral":
         show_overview(receitas_filtradas, despesas_filtradas, filters)
     elif selected == "💸 Despesas":
-        show_expenses(despesas_filtradas, filters, crud_system, FormsManager())
+        show_expenses(despesas_filtradas, filters, crud_system, forms_manager())
     elif selected == "💰 Receitas":
         show_revenues(receitas_filtradas, filters)
     elif selected == "🛒 Vendas":
@@ -183,26 +184,36 @@ def show_overview(receitas, despesas, filters):
     
     # Métricas principais
     col1, col2, col3, col4 = st.columns(4)
+    
+    total_receitas = receitas["VALOR"].sum() if "VALOR" in receitas.columns and not receitas.empty else 0
+    total_despesas = despesas["VALOR"].sum() if "VALOR" in despesas.columns and not despesas.empty else 0
+    saldo = total_receitas + total_despesas
+    
     with col1:
-        if "VALOR" in receitas.columns:
-            total_receitas = receitas["VALOR"].sum() if not receitas.empty else 0
-            st.metric("💰 Total Receitas", format_currency(total_receitas), delta=get_delta_html(total_receitas, 0))
-        else:
-            st.warning("Coluna 'VALOR' não encontrada em Receitas!")
-            total_receitas = 0
+        render_metric_card(
+            title="Total Receitas",
+            value=format_currency(total_receitas),
+            icon="💰"
+        )
     with col2:
-        if "VALOR" in despesas.columns:
-            total_despesas = despesas["VALOR"].sum() if not despesas.empty else 0
-            st.metric("💸 Total Despesas", format_currency(total_despesas), delta=get_delta_html(total_despesas, 0))
-        else:
-            st.warning("Coluna 'VALOR' não encontrada em Despesas!")
-            total_despesas = 0
+        render_metric_card(
+            title="Total Despesas",
+            value=format_currency(total_despesas),
+            icon="💸"
+        )
     with col3:
-        saldo = total_receitas + total_despesas
-        st.metric("💵 Saldo", format_currency(saldo), delta=get_delta_html(saldo, 0))
+        render_metric_card(
+            title="Saldo",
+            value=format_currency(saldo),
+            icon="💵"
+        )
     with col4:
-        percentual_despesas = (total_despesas / total_receitas) * 100 if total_receitas > 0 else 0
-        st.metric("📊 % Despesas/Receitas", format_percentage(percentual_despesas), delta=get_delta_html(percentual_despesas, 0, "percentage"))
+        percentual_despesas = (abs(total_despesas) / total_receitas) * 100 if total_receitas > 0 else 0
+        render_metric_card(
+            title="% Desp./Rec.",
+            value=f"{percentual_despesas:.1f}%",
+            icon="📊"
+        )
     
     # Gráficos de rosca "Top 5"
     st.markdown("### Top 5 Despesas")
