@@ -369,7 +369,6 @@ class FormsManager:
             return False
 
     def render_edit_expense_form(self, df_despesas, crud_system):
-        """Renderiza o formulário completo de edição de despesas."""
         st.markdown("### ✏️ Editar Despesa")
 
         if df_despesas.empty:
@@ -382,24 +381,28 @@ class FormsManager:
             axis=1
         )
         options = ["Selecione uma despesa para editar"] + df_despesas['display'].tolist()
-        
         selected_display = st.selectbox("Selecione a Despesa", options=options, index=0)
 
         if selected_display != "Selecione uma despesa para editar":
-            # Encontrar o índice da linha selecionada
             selected_index = df_despesas[df_despesas['display'] == selected_display].index[0]
             record_to_edit = df_despesas.loc[selected_index]
+
+            # Destaque visual na tabela (ajustado para tema escuro)
+            st.markdown(f"""
+            <div style='background-color:#cce5ff;padding:12px 18px;border-radius:8px;margin-bottom:10px;border:1px solid #339af0;'>
+                <b style='color:#003366;'>Em edição:</b> <span style='color:#003366;'>{selected_display}</span>
+            </div>
+            """, unsafe_allow_html=True)
 
             with st.form("edit_expense_form"):
                 st.info(f"Editando: {selected_display}")
 
-                categorias = self._get_categories_from_headers()
+                categorias = self._get_dynamic_options("Despesas", "CATEGORIA")
                 contas = self._get_dynamic_options("Conta", "Contas")
                 formas_pagamento = self._get_dynamic_options("Forma de Pagamento", "Forma de Pagamento")
-                
-                # Encontra o índice da opção atual para pré-selecionar
+
                 cat_index = categorias.index(record_to_edit['CATEGORIA']) if record_to_edit['CATEGORIA'] in categorias else 0
-                descricoes = self._get_descriptions_for_category(record_to_edit['CATEGORIA'])
+                descricoes = self._get_dynamic_descriptions(record_to_edit['CATEGORIA'])
                 desc_index = descricoes.index(record_to_edit['DESCRIÇÃO']) if record_to_edit['DESCRIÇÃO'] in descricoes else 0
                 conta_index = contas.index(record_to_edit['CONTA']) if record_to_edit['CONTA'] in contas else 0
                 fp_index = formas_pagamento.index(record_to_edit['FORMA DE PAGAMENTO']) if record_to_edit['FORMA DE PAGAMENTO'] in formas_pagamento else 0
@@ -410,7 +413,6 @@ class FormsManager:
                     categoria = st.selectbox("Categoria", options=categorias, index=cat_index)
                     descricao = st.selectbox("Descrição", options=descricoes, index=desc_index)
                     favorecido = st.text_input("Favorecido", value=record_to_edit['FAVORECIDO'])
-                
                 with col2:
                     conta = st.selectbox("Conta", options=contas, index=conta_index)
                     forma_pagamento = st.selectbox("Forma de Pagamento", options=formas_pagamento, index=fp_index)
@@ -420,20 +422,23 @@ class FormsManager:
                 submitted = st.form_submit_button("💾 Salvar Alterações")
 
                 if submitted:
-                    updated_data = {
-                        "DATA": pd.to_datetime(data), "CATEGORIA": categoria, "DESCRIÇÃO": descricao,
-                        "FAVORECIDO": favorecido, "CONTA": conta, "FORMA DE PAGAMENTO": forma_pagamento,
-                        "VALOR": -abs(valor), "PAGO": 1 if pago else 0
-                    }
-                    success, message = crud_system.update_record("Despesas", selected_index, updated_data)
-                    if success:
-                        st.success("✅ Despesa atualizada com sucesso!")
-                        st.session_state['show_edit_Despesas'] = False
-                        data_manager.clear_cache()
-                        st.rerun()
+                    if not categoria or not descricao or valor <= 0:
+                        st.error("Preencha todos os campos obrigatórios corretamente!")
                     else:
-                        st.error(f"❌ Erro ao atualizar: {message}")
-        
+                        updated_data = {
+                            "DATA": pd.to_datetime(data), "CATEGORIA": categoria, "DESCRIÇÃO": descricao,
+                            "FAVORECIDO": favorecido, "CONTA": conta, "FORMA DE PAGAMENTO": forma_pagamento,
+                            "VALOR": -abs(valor), "PAGO": 1 if pago else 0
+                        }
+                        success, message = crud_system.update_record("Despesas", selected_index, updated_data)
+                        if success:
+                            st.success("✅ Despesa atualizada com sucesso!")
+                            st.session_state['show_edit_Despesas'] = False
+                            data_manager.clear_cache()
+                            st.rerun()
+                        else:
+                            st.error(f"❌ Erro ao atualizar: {message}")
+
         if st.button("❌ Cancelar Edição"):
             st.session_state['show_edit_Despesas'] = False
             st.rerun()
