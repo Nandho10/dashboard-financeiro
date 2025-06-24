@@ -335,35 +335,6 @@ def show_overview(receitas, despesas, vendas, all_vendas):
 def show_expenses(despesas_filtradas, crud_system, forms_manager):
     st.markdown("## 💸 Despesas Detalhadas")
     
-    # --- BOTÕES DE AÇÃO UNIFICADOS ---
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        if st.button("➕ Novo Lançamento", type="primary", use_container_width=True):
-            st.session_state.show_expense_form = not st.session_state.get("show_expense_form", False)
-            st.session_state.show_edit_Despesas = False
-            st.session_state.show_delete_Despesas = False
-            st.session_state.show_bulk_delete_Despesas = False
-    with col2:
-        if st.button("✏️ Editar", use_container_width=True):
-            st.session_state.show_edit_Despesas = not st.session_state.get("show_edit_Despesas", False)
-            st.session_state.show_expense_form = False
-            st.session_state.show_delete_Despesas = False
-            st.session_state.show_bulk_delete_Despesas = False
-    with col3:
-        if st.button("🗑️ Excluir", use_container_width=True):
-            st.session_state.show_delete_Despesas = not st.session_state.get("show_delete_Despesas", False)
-            st.session_state.show_expense_form = False
-            st.session_state.show_edit_Despesas = False
-            st.session_state.show_bulk_delete_Despesas = False
-    with col4:
-        if st.button("🗑️ Excl. em Lote", use_container_width=True):
-            st.session_state.show_bulk_delete_Despesas = not st.session_state.get("show_bulk_delete_Despesas", False)
-            st.session_state.show_expense_form = False
-            st.session_state.show_edit_Despesas = False
-            st.session_state.show_delete_Despesas = False
-    
-    st.divider()
-
     # Métricas principais
     col1, col2, col3, col4 = st.columns(4)
     
@@ -510,6 +481,33 @@ def show_expenses(despesas_filtradas, crud_system, forms_manager):
         create_editable_table(df_display, "Despesas", crud_system)
     else:
         st.info("Nenhuma despesa encontrada para o período selecionado.")
+
+    # --- BOTÕES DE AÇÃO UNIFICADOS (agora IMEDIATAMENTE abaixo da tabela) ---
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        if st.button("➕ Novo Lançamento", type="primary", use_container_width=True):
+            st.session_state.show_expense_form = not st.session_state.get("show_expense_form", False)
+            st.session_state.show_edit_Despesas = False
+            st.session_state.show_delete_Despesas = False
+            st.session_state.show_bulk_delete_Despesas = False
+    with col2:
+        if st.button("✏️ Editar", use_container_width=True):
+            st.session_state.show_edit_Despesas = not st.session_state.get("show_edit_Despesas", False)
+            st.session_state.show_expense_form = False
+            st.session_state.show_delete_Despesas = False
+            st.session_state.show_bulk_delete_Despesas = False
+    with col3:
+        if st.button("🗑️ Excluir", use_container_width=True):
+            st.session_state.show_delete_Despesas = not st.session_state.get("show_delete_Despesas", False)
+            st.session_state.show_expense_form = False
+            st.session_state.show_edit_Despesas = False
+            st.session_state.show_bulk_delete_Despesas = False
+    with col4:
+        if st.button("🗑️ Excl. em Lote", use_container_width=True):
+            st.session_state.show_bulk_delete_Despesas = not st.session_state.get("show_bulk_delete_Despesas", False)
+            st.session_state.show_expense_form = False
+            st.session_state.show_edit_Despesas = False
+            st.session_state.show_delete_Despesas = False
 
     st.divider()
 

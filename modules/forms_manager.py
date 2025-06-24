@@ -62,13 +62,17 @@ class FormsManager:
         st.write("Entrou no formulário de despesa")  # Debug 1
         st.markdown("### 💸 Nova Despesa")
 
+        # --- Categoria dinâmica ---
         categorias = self._get_dynamic_options("Despesas", "CATEGORIA")
+        categorias.append("--- Digitar Nova Categoria ---")
         selected_categoria = st.selectbox("Categoria", options=categorias, key="categoria_selectbox")
-        st.write("Categoria selecionada:", selected_categoria)  # Debug 2
-        
-        # Carregar descrições dinâmicas da aba 'Despesas Categoria' conforme a categoria
+        nova_categoria = None
+        if selected_categoria == "--- Digitar Nova Categoria ---":
+            nova_categoria = st.text_input("Digite a nova categoria:", key="nova_categoria_text", placeholder="Ex: Saúde")
+
+        # --- Descrição dinâmica (já implementada) ---
         descricoes_teste = []
-        if selected_categoria and selected_categoria.strip():
+        if (selected_categoria and selected_categoria.strip() and selected_categoria != "--- Digitar Nova Categoria ---"):
             try:
                 df_cat = pd.read_excel(self.excel_file, sheet_name="Despesas Categoria")
                 if selected_categoria in df_cat.columns:
@@ -77,51 +81,67 @@ class FormsManager:
                 st.warning(f"Erro ao carregar descrições da planilha: {e}")
         if not descricoes_teste:
             descricoes_teste = ["Nenhuma descrição disponível para esta categoria"]
-        # Adiciona opção para digitar nova descrição
         descricoes_teste.append("--- Digitar Nova Descrição ---")
-
-        # Selectbox de descrição fora do formulário
         descricao = st.selectbox("Descrição", options=descricoes_teste, key="descricao_selectbox")
         nova_descricao = None
         if descricao == "--- Digitar Nova Descrição ---":
-            st.markdown("### ✏️ Nova Descrição")
             nova_descricao = st.text_input("Digite a nova descrição:", key="nova_descricao_text", placeholder="Ex: Supermercado Extra")
 
-        with st.form(key=f"form_despesa_{selected_categoria}"):
-            col1, col2 = st.columns(2)
-            with col1:
-                data = st.date_input("Data", value=date.today(), key=f"data_{selected_categoria}")
-                favorecidos = self._get_dynamic_options("Despesas", "FAVORECIDO")
-                favorecidos.append("--- Digitar Novo Favorecido ---")
-                favorecido = st.selectbox("Favorecido", options=favorecidos, key=f"favorecido_{selected_categoria}")
-                novo_favorecido_input = None
-                if favorecido == "--- Digitar Novo Favorecido ---":
-                    novo_favorecido_input = st.text_input("Digite o novo favorecido", key=f"novo_favorecido_{selected_categoria}")
-                conta = st.selectbox("Conta", options=self._get_dynamic_options("Conta", "Contas"), key=f"conta_{selected_categoria}")
-            with col2:
-                forma_pagamento = st.selectbox("Forma de Pagamento", options=self._get_dynamic_options("Forma de Pagamento", "Forma de Pagamento"), key=f"forma_pagamento_{selected_categoria}")
-                valor = st.number_input("Valor", min_value=0.01, value=0.01, step=0.01, key=f"valor_{selected_categoria}")
-                pago = st.checkbox("Pago", value=True, key=f"pago_{selected_categoria}")
-            submitted = st.form_submit_button("Salvar")
+        # --- Favorecido dinâmico ---
+        favorecidos = self._get_dynamic_options("Despesas", "FAVORECIDO")
+        favorecidos.append("--- Digitar Novo Favorecido ---")
+        favorecido = st.selectbox("Favorecido", options=favorecidos, key="favorecido_selectbox")
+        novo_favorecido = None
+        if favorecido == "--- Digitar Novo Favorecido ---":
+            novo_favorecido = st.text_input("Digite o novo favorecido:", key="novo_favorecido_text", placeholder="Ex: João da Silva")
 
+        # --- Conta dinâmica ---
+        contas = self._get_dynamic_options("Conta", "Contas")
+        contas.append("--- Digitar Nova Conta ---")
+        conta = st.selectbox("Conta", options=contas, key="conta_selectbox")
+        nova_conta = None
+        if conta == "--- Digitar Nova Conta ---":
+            nova_conta = st.text_input("Digite a nova conta:", key="nova_conta_text", placeholder="Ex: Banco Inter")
+
+        # --- Forma de Pagamento dinâmica ---
+        formas_pagamento = self._get_dynamic_options("Forma de Pagamento", "Forma de Pagamento")
+        formas_pagamento.append("--- Digitar Nova Forma de Pagamento ---")
+        forma_pagamento = st.selectbox("Forma de Pagamento", options=formas_pagamento, key="forma_pagamento_selectbox")
+        nova_forma_pagamento = None
+        if forma_pagamento == "--- Digitar Nova Forma de Pagamento ---":
+            nova_forma_pagamento = st.text_input("Digite a nova forma de pagamento:", key="nova_forma_pagamento_text", placeholder="Ex: PIX")
+
+        valor = st.number_input("Valor", min_value=0.01, value=0.01, step=0.01, key="valor_input")
+        pago = st.checkbox("Pago", value=True, key="pago_checkbox")
+        data = st.date_input("Data", value=date.today(), key="data_input")
+
+        with st.form(key=f"form_despesa_{selected_categoria}"):
+            submitted = st.form_submit_button("Salvar")
             if submitted:
-                descricao_final = nova_descricao if descricao == "--- Digitar Nova Descrição ---" else descricao
-                final_favorecido = novo_favorecido_input if favorecido == "--- Digitar Novo Favorecido ---" and novo_favorecido_input else favorecido
-                if not selected_categoria or selected_categoria == "":
+                categoria_final = nova_categoria if selected_categoria == "--- Digitar Nova Categoria ---" and nova_categoria else selected_categoria
+                descricao_final = nova_descricao if descricao == "--- Digitar Nova Descrição ---" and nova_descricao else descricao
+                favorecido_final = novo_favorecido if favorecido == "--- Digitar Novo Favorecido ---" and novo_favorecido else favorecido
+                conta_final = nova_conta if conta == "--- Digitar Nova Conta ---" and nova_conta else conta
+                forma_pagamento_final = nova_forma_pagamento if forma_pagamento == "--- Digitar Nova Forma de Pagamento ---" and nova_forma_pagamento else forma_pagamento
+                if not categoria_final or categoria_final == "" or categoria_final == "--- Digitar Nova Categoria ---":
                     st.error("❌ Categoria é obrigatória!")
                 elif not descricao_final or descricao_final.strip() == "" or descricao_final == "Nenhuma descrição disponível para esta categoria":
                     st.error("❌ Descrição é obrigatória!")
                 elif valor <= 0:
                     st.error("❌ Valor deve ser maior que zero!")
-                elif favorecido == "--- Digitar Novo Favorecido ---" and (not novo_favorecido_input or novo_favorecido_input.strip() == ""):
+                elif favorecido == "--- Digitar Novo Favorecido ---" and (not novo_favorecido or novo_favorecido.strip() == ""):
                     st.error("❌ Digite o nome do novo favorecido!")
+                elif conta == "--- Digitar Nova Conta ---" and (not nova_conta or nova_conta.strip() == ""):
+                    st.error("❌ Digite o nome da nova conta!")
+                elif forma_pagamento == "--- Digitar Nova Forma de Pagamento ---" and (not nova_forma_pagamento or nova_forma_pagamento.strip() == ""):
+                    st.error("❌ Digite a nova forma de pagamento!")
                 else:
                     nova_despesa_dados = {
-                        "DATA": data, "CATEGORIA": selected_categoria, "DESCRIÇÃO": descricao_final,
-                        "FAVORECIDO": final_favorecido, "CONTA": conta, "FORMA DE PAGAMENTO": forma_pagamento,
+                        "DATA": data, "CATEGORIA": categoria_final, "DESCRIÇÃO": descricao_final,
+                        "FAVORECIDO": favorecido_final, "CONTA": conta_final, "FORMA DE PAGAMENTO": forma_pagamento_final,
                         "VALOR": -abs(valor), "PAGO": 1 if pago else 0
                     }
-                    st.success(f"Descrição salva: {descricao_final}")
+                    st.success(f"Despesa salva: {descricao_final}")
     
     def create_revenue_form(self):
         """Cria formulário para adicionar receita"""
