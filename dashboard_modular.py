@@ -9,13 +9,14 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, date
 import warnings
+import uuid
 warnings.filterwarnings('ignore')
 
 # Importar módulos
 from modules.data_manager import data_manager
 from modules.filters_manager import filters_manager
 from modules.charts_manager import charts_manager
-from modules.forms_manager import forms_manager
+from modules.forms_manager import forms_manager, FormsManager, consultar_despesas
 from utils.formatters import format_currency, format_percentage, safe_divide
 from utils.metrics_manager import render_metric_card
 # KpiManager para calculos de Kpis de Vendas
@@ -178,7 +179,7 @@ def main():
         show_investments(investimentos_filtrados, filters, crud_system, forms_manager)
     elif selected == "📋 Orçamento":
         show_budget(receitas_filtradas, despesas_filtradas, orcamento, filters)
-    elif selected == "�� Análises":
+    elif selected == "📈 Análises":
         show_analytics(receitas_filtradas, despesas_filtradas)
 
 def show_overview(receitas, despesas, vendas, all_vendas):
@@ -331,8 +332,200 @@ def show_overview(receitas, despesas, vendas, all_vendas):
         else:
             st.info("Sem dados de vendas para analisar por dia da semana.")
 
-def show_expenses(df, crud_system, forms_manager):
-    show_page_template("💸 Despesas Detalhadas", df, "Despesas", crud_system, forms_manager, "expense")
+def show_expenses(despesas_filtradas, crud_system, forms_manager):
+    st.markdown("## 💸 Despesas Detalhadas")
+    
+    # --- BOTÕES DE AÇÃO UNIFICADOS ---
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        if st.button("➕ Novo Lançamento", type="primary", use_container_width=True):
+            st.session_state.show_expense_form = not st.session_state.get("show_expense_form", False)
+            st.session_state.show_edit_Despesas = False
+            st.session_state.show_delete_Despesas = False
+            st.session_state.show_bulk_delete_Despesas = False
+    with col2:
+        if st.button("✏️ Editar", use_container_width=True):
+            st.session_state.show_edit_Despesas = not st.session_state.get("show_edit_Despesas", False)
+            st.session_state.show_expense_form = False
+            st.session_state.show_delete_Despesas = False
+            st.session_state.show_bulk_delete_Despesas = False
+    with col3:
+        if st.button("🗑️ Excluir", use_container_width=True):
+            st.session_state.show_delete_Despesas = not st.session_state.get("show_delete_Despesas", False)
+            st.session_state.show_expense_form = False
+            st.session_state.show_edit_Despesas = False
+            st.session_state.show_bulk_delete_Despesas = False
+    with col4:
+        if st.button("🗑️ Excl. em Lote", use_container_width=True):
+            st.session_state.show_bulk_delete_Despesas = not st.session_state.get("show_bulk_delete_Despesas", False)
+            st.session_state.show_expense_form = False
+            st.session_state.show_edit_Despesas = False
+            st.session_state.show_delete_Despesas = False
+    
+    st.divider()
+
+    # Métricas principais
+    col1, col2, col3, col4 = st.columns(4)
+    
+    total_despesas = despesas_filtradas["VALOR"].sum() if "VALOR" in despesas_filtradas.columns and not despesas_filtradas.empty else 0
+    num_despesas = len(despesas_filtradas) if not despesas_filtradas.empty else 0
+    valor_medio = total_despesas / num_despesas if num_despesas > 0 else 0
+    num_categorias = despesas_filtradas["CATEGORIA"].nunique() if "CATEGORIA" in despesas_filtradas.columns and not despesas_filtradas.empty else 0
+    
+    # Determinar se despesas estão controladas (baseado no valor médio)
+    if valor_medio >= -2000:  # Limite arbitrário para "despesas controladas"
+        status_icon = "✅"
+        status_title = "Despesas Controladas"
+        status_color = "green"
+        status_message = "Continue controlando! 💪"
+    elif valor_medio >= -3000:
+        status_icon = "⚠️"
+        status_title = "Despesas Moderadas"
+        status_color = "orange"
+        status_message = "Atenção aos gastos! 📊"
+    else:
+        status_icon = "🚨"
+        status_title = "Despesas Altas"
+        status_color = "red"
+        status_message = "Reveja seus gastos! 💡"
+    
+    with col1:
+        render_metric_card(
+            title="Total Despesas",
+            value=format_currency(total_despesas),
+            icon="💸"
+        )
+    with col2:
+        render_metric_card(
+            title="Nº de Despesas",
+            value=str(num_despesas),
+            icon="📊"
+        )
+    with col3:
+        render_metric_card(
+            title="Valor Médio",
+            value=format_currency(valor_medio),
+            icon="📈"
+        )
+    with col4:
+        # Card personalizado para status das despesas
+        st.markdown(f"""
+        <div style="
+            background: linear-gradient(135deg, {'#d4edda' if status_color == 'green' else '#fff3cd' if status_color == 'orange' else '#f8d7da'}, {'#c3e6cb' if status_color == 'green' else '#ffeaa7' if status_color == 'orange' else '#f5c6cb'});
+            border: 2px solid {'#28a745' if status_color == 'green' else '#ffc107' if status_color == 'orange' else '#dc3545'};
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin: 10px 0;
+        ">
+            <div style="font-size: 2.5em; margin-bottom: 10px;">{status_icon}</div>
+            <div style="font-size: 1.2em; font-weight: bold; color: {'#155724' if status_color == 'green' else '#856404' if status_color == 'orange' else '#721c24'}; margin-bottom: 5px;">
+                {status_title}
+            </div>
+            <div style="font-size: 1.1em; color: {'#155724' if status_color == 'green' else '#856404' if status_color == 'orange' else '#721c24'}; margin-bottom: 5px;">
+                Média: {format_currency(valor_medio)}
+            </div>
+            <div style="font-size: 0.9em; color: {'#155724' if status_color == 'green' else '#856404' if status_color == 'orange' else '#721c24'}; margin-top: 5px;">
+                {status_message}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Gráficos de rosca "Top 5"
+    st.markdown("### Top 5 Despesas")
+    col_pie1, col_pie2, col_pie3 = st.columns(3)
+    
+    if not despesas_filtradas.empty and "VALOR" in despesas_filtradas.columns:
+        # Top 5 por categoria
+        with col_pie1:
+            if 'CATEGORIA' in despesas_filtradas.columns:
+                df_cat = despesas_filtradas.dropna(subset=['CATEGORIA'])
+                df_cat = df_cat[df_cat['CATEGORIA'].str.strip() != '']
+                if not df_cat.empty:
+                    top_categorias = df_cat.groupby('CATEGORIA')["VALOR"].sum().abs().sort_values(ascending=False).head(5).reset_index()
+                    fig_categorias = charts_manager.create_pie_chart(
+                        top_categorias, "VALOR", 'CATEGORIA', "Top 5 Categorias", hole=0.5, showlegend=True
+                    )
+                    st.plotly_chart(fig_categorias, use_container_width=True)
+        # Top 5 por descrição
+        with col_pie2:
+            if 'DESCRIÇÃO' in despesas_filtradas.columns:
+                df_desc = despesas_filtradas.dropna(subset=['DESCRIÇÃO'])
+                df_desc = df_desc[df_desc['DESCRIÇÃO'].str.strip() != '']
+                if not df_desc.empty:
+                    top_descricoes = df_desc.groupby('DESCRIÇÃO')["VALOR"].sum().abs().sort_values(ascending=False).head(5).reset_index()
+                    fig_descricoes = charts_manager.create_pie_chart(
+                        top_descricoes, "VALOR", 'DESCRIÇÃO', "Top 5 Descrições", hole=0.5, showlegend=True
+                    )
+                    st.plotly_chart(fig_descricoes, use_container_width=True)
+        # Top 5 por favorecido
+        with col_pie3:
+            if 'FAVORECIDO' in despesas_filtradas.columns:
+                df_fav = despesas_filtradas.dropna(subset=['FAVORECIDO'])
+                df_fav = df_fav[df_fav['FAVORECIDO'].str.strip() != '']
+                if not df_fav.empty:
+                    top_favorecidos = df_fav.groupby('FAVORECIDO')["VALOR"].sum().abs().sort_values(ascending=False).head(5).reset_index()
+                    fig_favorecidos = charts_manager.create_pie_chart(
+                        top_favorecidos, "VALOR", 'FAVORECIDO', "Top 5 Favorecidos", hole=0.5, showlegend=True
+                    )
+                    st.plotly_chart(fig_favorecidos, use_container_width=True)
+        
+        # Evolução temporal
+        if "DATA" in despesas_filtradas.columns and not despesas_filtradas.empty:
+            despesas_copy = despesas_filtradas.copy()
+            despesas_copy["DATA"] = pd.to_datetime(despesas_copy["DATA"], errors='coerce')
+            despesas_copy = despesas_copy.dropna(subset=["DATA"])
+
+            if not despesas_copy.empty:
+                # Decide o período de agrupamento (diário vs. mensal)
+                date_range_days = (despesas_copy["DATA"].max() - despesas_copy["DATA"].min()).days
+                
+                if date_range_days <= 90:
+                    # Agrupamento diário para períodos curtos
+                    despesas_temporais = despesas_copy.groupby(despesas_copy["DATA"].dt.date)["VALOR"].sum().reset_index()
+                    x_axis_col = "DATA"
+                    chart_title = "Evolução Diária das Despesas"
+                else:
+                    # Agrupamento mensal para períodos longos
+                    despesas_copy["Mes"] = despesas_copy["DATA"].dt.strftime("%Y-%m")
+                    despesas_temporais = despesas_copy.groupby("Mes")["VALOR"].sum().sort_index().reset_index()
+                    x_axis_col = "Mes"
+                    chart_title = "Evolução Mensal das Despesas"
+                
+                # Garante que há pelo menos 2 pontos para desenhar uma linha
+                if len(despesas_temporais) > 1:
+                    fig_temporal = charts_manager.create_line_chart(
+                        despesas_temporais, x_axis_col, "VALOR", chart_title
+                    )
+                    st.plotly_chart(fig_temporal, use_container_width=True)
+                else:
+                    st.info("Não há dados suficientes no período selecionado para exibir a evolução temporal.")
+
+    # Tabela de despesas detalhadas (agora renderizada antes dos formulários)
+    st.markdown("### 📋 Despesas Lançadas")
+    if not despesas_filtradas.empty:
+        despesas_crud = despesas_filtradas.copy()
+        df_display = format_dataframe_for_display(despesas_crud, "Despesas")
+        create_editable_table(df_display, "Despesas", crud_system)
+    else:
+        st.info("Nenhuma despesa encontrada para o período selecionado.")
+
+    st.divider()
+
+    # --- FASE 3: FORMULÁRIO DE INCLUSÃO DE NOVA DESPESA ---
+    if st.session_state.get("show_expense_form", False):
+        forms_manager.create_expense_form()
+
+    # --- LÓGICA PARA EXIBIR OUTROS FORMULÁRIOS ---
+    if st.session_state.get("show_edit_Despesas", False):
+        forms_manager.render_edit_expense_form(despesas_filtradas, crud_system)
+
+    if st.session_state.get("show_delete_Despesas", False):
+        forms_manager.render_delete_expense_form(despesas_filtradas, crud_system)
+
+    if st.session_state.get("show_bulk_delete_Despesas", False):
+        forms_manager.render_bulk_delete_expense_form(despesas_filtradas, crud_system)
 
 def show_revenues(receitas, filters, crud_system, forms_manager):
     st.markdown("## 💰 Análise de Receitas")
@@ -1278,6 +1471,15 @@ def show_analytics(receitas, despesas, filters):
 def show_page_template(title, df, sheet_name, crud_system, forms_manager, form_name):
     st.markdown(f"## {title}")
     
+    # Exibe a tabela de despesas detalhadas se for a página de despesas
+    if sheet_name == "Despesas":
+        st.markdown("### 📋 Despesas Lançadas")
+        if not df.empty:
+            df_display = format_dataframe_for_display(df, sheet_name)
+            create_editable_table(df_display, sheet_name, crud_system)
+        else:
+            st.info("Nenhuma despesa encontrada para o período selecionado.")
+    
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         if st.button(f"➕ Novo Lançamento", type="primary", use_container_width=True, key=f"add_{sheet_name}"):
@@ -1286,18 +1488,14 @@ def show_page_template(title, df, sheet_name, crud_system, forms_manager, form_n
             for other_form in ['expense', 'revenue', 'sale', 'credit_card', 'investment']:
                 if other_form != form_name:
                     st.session_state[f"show_{other_form}_form"] = False
-    
-    # --- BOTÕES DE AÇÃO UNIFICADOS ---
     with col2:
         if st.button("✏️ Editar", use_container_width=True, key=f"edit_{sheet_name}"):
             st.session_state[f"show_edit_{sheet_name}"] = not st.session_state.get(f"show_edit_{sheet_name}", False)
             st.session_state[f"show_{form_name}_form"] = False
-
     with col3:
         if st.button("🗑️ Excluir", use_container_width=True, key=f"delete_{sheet_name}"):
             st.session_state[f"show_delete_{sheet_name}"] = not st.session_state.get(f"show_delete_{sheet_name}", False)
             st.session_state[f"show_{form_name}_form"] = False
-
     with col4:
         if st.button("🗑️ Excl. em Lote", use_container_width=True, key=f"bulk_delete_{sheet_name}"):
             st.session_state[f"show_bulk_delete_{sheet_name}"] = not st.session_state.get(f"show_bulk_delete_{sheet_name}", False)
@@ -1305,9 +1503,39 @@ def show_page_template(title, df, sheet_name, crud_system, forms_manager, form_n
 
     st.divider()
     
-    if not df.empty:
-        getattr(forms_manager, f"create_{form_name}_form")()
-    
+    # Exibe o formulário apenas se o botão foi clicado
+    if sheet_name == "Despesas" and st.session_state.get(f"show_{form_name}_form", False):
+        # Primeiro, obtenha a categoria selecionada
+        categorias = self._get_dynamic_options("Despesas", "CATEGORIA")
+        selected_categoria = st.selectbox("Categoria", options=categorias, key="categoria_selectbox")
+
+        if selected_categoria:
+            favorecidos = self._get_dynamic_options("Despesas", "FAVORECIDO")
+            favorecidos.append("--- Digitar Novo Favorecido ---")
+            form_id = str(uuid.uuid4())
+            with st.form(key=f"form_despesa_{selected_categoria}_{form_id}"):
+                st.info(f"Categoria selecionada: **{selected_categoria}**")
+                col1, col2 = st.columns(2)
+                with col1:
+                    data = st.date_input("Data", value=date.today(), key=f"data_{selected_categoria}_{form_id}")
+                    favorecido = st.selectbox(
+                        "Favorecido",
+                        options=favorecidos,
+                        key=f"favorecido_select_{selected_categoria}_{form_id}"
+                    )
+                    if favorecido == "--- Digitar Novo Favorecido ---":
+                        novo_favorecido_input = st.text_input(
+                            "Novo Favorecido:",
+                            placeholder="Digite o nome do novo favorecido",
+                            key=f"novo_favorecido_input_{selected_categoria}_{form_id}"
+                        )
+                with col2:
+                    conta = st.selectbox("Conta", options=contas, key=f"conta_{selected_categoria}_{form_id}")
+                    forma_pagamento = st.selectbox("Forma de Pagamento", options=formas_pagamento, key=f"forma_pagamento_{selected_categoria}_{form_id}")
+                    valor = st.number_input("Valor (R$)", min_value=0.01, step=50.0, format="%.2f", key=f"valor_{selected_categoria}_{form_id}")
+                    pago = st.checkbox("Pago?", value=True, key=f"pago_{selected_categoria}_{form_id}")
+                submitted = st.form_submit_button("Salvar", key=f"submit_{selected_categoria}_{form_id}")
+
     edit_key = f"show_edit_{sheet_name}"
     if st.session_state.get(edit_key, False):
         render_func = getattr(forms_manager, f"render_edit_{form_name}_form", None)
@@ -1325,6 +1553,46 @@ def show_page_template(title, df, sheet_name, crud_system, forms_manager, form_n
         render_func = getattr(forms_manager, f"render_bulk_delete_form", None)
         if render_func:
             render_func(sheet_name, crud_system, df)
+
+def consultar_despesas(storage):
+    """Consulta todas as despesas cadastradas no armazenamento e exibe em tabela com filtros."""
+    st.header("Consulta de Despesas")
+    if storage.empty:
+        st.info("Nenhuma despesa cadastrada.")
+        return
+
+    # Filtros
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        categorias = ["Todas"] + sorted(storage["CATEGORIA"].dropna().unique().tolist())
+        filtro_categoria = st.selectbox("Filtrar por Categoria", categorias)
+    with col2:
+        favorecidos = ["Todos"] + sorted(storage["FAVORECIDO"].dropna().unique().tolist())
+        filtro_favorecido = st.selectbox("Filtrar por Favorecido", favorecidos)
+    with col3:
+        datas = pd.to_datetime(storage["DATA"], errors="coerce")
+        data_min = datas.min().date() if not datas.isnull().all() else date.today()
+        data_max = datas.max().date() if not datas.isnull().all() else date.today()
+        filtro_data = st.date_input("Filtrar por Data", (data_min, data_max))
+
+    # Aplicar filtros
+    df_filtrado = storage.copy()
+    if filtro_categoria != "Todas":
+        df_filtrado = df_filtrado[df_filtrado["CATEGORIA"] == filtro_categoria]
+    if filtro_favorecido != "Todos":
+        df_filtrado = df_filtrado[df_filtrado["FAVORECIDO"] == filtro_favorecido]
+    if filtro_data:
+        data_ini, data_fim = filtro_data
+        datas = pd.to_datetime(df_filtrado["DATA"], errors="coerce")
+        mask = (datas >= pd.to_datetime(data_ini)) & (datas <= pd.to_datetime(data_fim))
+        df_filtrado = df_filtrado[mask]
+
+    # Exibir tabela
+    st.dataframe(df_filtrado.reset_index(drop=True))
+
+    # Exportação
+    csv = df_filtrado.to_csv(index=False).encode('utf-8')
+    st.download_button("Exportar para CSV", csv, "despesas_filtradas.csv", "text/csv")
 
 if __name__ == "__main__":
     main() 

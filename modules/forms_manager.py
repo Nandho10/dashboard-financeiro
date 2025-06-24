@@ -9,6 +9,7 @@ import pandas as pd
 from datetime import datetime, date
 from modules.data_manager import data_manager
 from utils.formatters import format_currency, format_date
+import uuid
 
 class FormsManager:
     """Classe para gerenciar formulários de CRUD"""
@@ -46,65 +47,81 @@ class FormsManager:
         except Exception:
             return [""]
 
+    def _get_dynamic_descriptions(self, categoria):
+        """Carrega descrições da aba 'Despesas Categoria' para a categoria selecionada."""
+        try:
+            df = pd.read_excel(self.excel_file, sheet_name="Despesas Categoria")
+            if categoria in df.columns:
+                return [d for d in df[categoria].dropna().unique() if str(d).strip() != ""]
+            return []
+        except Exception:
+            return []
+
     def create_expense_form(self):
         """Cria formulário de despesa com categorias e descrições em cascata."""
+        st.write("Entrou no formulário de despesa")  # Debug 1
         st.markdown("### 💸 Nova Despesa")
 
-        # --- Parte 1: Seleção da Categoria (fora do formulário) ---
-        categorias = self._get_categories_from_headers()
-        selected_categoria = st.selectbox(
-            "1. Selecione a Categoria",
-            options=categorias,
-            key="categoria_selector" # Chave única para este widget
-        )
+        categorias = self._get_dynamic_options("Despesas", "CATEGORIA")
+        selected_categoria = st.selectbox("Categoria", options=categorias, key="categoria_selectbox")
+        st.write("Categoria selecionada:", selected_categoria)  # Debug 2
+        
+        # Carregar descrições dinâmicas da aba 'Despesas Categoria' conforme a categoria
+        descricoes_teste = []
+        if selected_categoria and selected_categoria.strip():
+            try:
+                df_cat = pd.read_excel(self.excel_file, sheet_name="Despesas Categoria")
+                if selected_categoria in df_cat.columns:
+                    descricoes_teste = [d for d in df_cat[selected_categoria].dropna().unique() if str(d).strip() != ""]
+            except Exception as e:
+                st.warning(f"Erro ao carregar descrições da planilha: {e}")
+        if not descricoes_teste:
+            descricoes_teste = ["Nenhuma descrição disponível para esta categoria"]
+        # Adiciona opção para digitar nova descrição
+        descricoes_teste.append("--- Digitar Nova Descrição ---")
 
-        # O formulário só aparece depois que uma categoria é selecionada
-        if selected_categoria:
-            with st.form("expense_details_form", clear_on_submit=True):
-                
-                # --- Parte 2: Restante do Formulário ---
-                st.info(f"Categoria selecionada: **{selected_categoria}**")
+        # Selectbox de descrição fora do formulário
+        descricao = st.selectbox("Descrição", options=descricoes_teste, key="descricao_selectbox")
+        nova_descricao = None
+        if descricao == "--- Digitar Nova Descrição ---":
+            st.markdown("### ✏️ Nova Descrição")
+            nova_descricao = st.text_input("Digite a nova descrição:", key="nova_descricao_text", placeholder="Ex: Supermercado Extra")
 
-                # Carrega opções dependentes
-                descricoes = self._get_descriptions_for_category(selected_categoria)
-                descricoes.append("--- Digitar Nova Descrição ---")
+        with st.form(key=f"form_despesa_{selected_categoria}"):
+            col1, col2 = st.columns(2)
+            with col1:
+                data = st.date_input("Data", value=date.today(), key=f"data_{selected_categoria}")
                 favorecidos = self._get_dynamic_options("Despesas", "FAVORECIDO")
-                contas = self._get_dynamic_options("Conta", "Contas")
-                formas_pagamento = self._get_dynamic_options("Forma de Pagamento", "Forma de Pagamento")
+                favorecidos.append("--- Digitar Novo Favorecido ---")
+                favorecido = st.selectbox("Favorecido", options=favorecidos, key=f"favorecido_{selected_categoria}")
+                novo_favorecido_input = None
+                if favorecido == "--- Digitar Novo Favorecido ---":
+                    novo_favorecido_input = st.text_input("Digite o novo favorecido", key=f"novo_favorecido_{selected_categoria}")
+                conta = st.selectbox("Conta", options=self._get_dynamic_options("Conta", "Contas"), key=f"conta_{selected_categoria}")
+            with col2:
+                forma_pagamento = st.selectbox("Forma de Pagamento", options=self._get_dynamic_options("Forma de Pagamento", "Forma de Pagamento"), key=f"forma_pagamento_{selected_categoria}")
+                valor = st.number_input("Valor", min_value=0.01, value=0.01, step=0.01, key=f"valor_{selected_categoria}")
+                pago = st.checkbox("Pago", value=True, key=f"pago_{selected_categoria}")
+            submitted = st.form_submit_button("Salvar")
 
-                col1, col2 = st.columns(2)
-                with col1:
-                    data = st.date_input("Data", value=date.today())
-                    
-                    selected_descricao = st.selectbox("2. Descrição", options=descricoes)
-                    nova_descricao_input = ""
-                    if selected_descricao == "--- Digitar Nova Descrição ---":
-                        nova_descricao_input = st.text_input("Nova Descrição:", placeholder="Digite a nova descrição")
-
-                    favorecido = st.selectbox("Favorecido", options=favorecidos)
-
-                with col2:
-                    conta = st.selectbox("Conta", options=contas)
-                    forma_pagamento = st.selectbox("Forma de Pagamento", options=formas_pagamento)
-                    valor = st.number_input("Valor (R$)", min_value=0.01, step=50.0, format="%.2f")
-                    pago = st.checkbox("Pago?", value=True)
-
-                submitted = st.form_submit_button("💾 Salvar Despesa", type="primary", use_container_width=True)
-                
-                if submitted:
-                    final_descricao = nova_descricao_input if selected_descricao == "--- Digitar Nova Descrição ---" else selected_descricao
-                    
+            if submitted:
+                descricao_final = nova_descricao if descricao == "--- Digitar Nova Descrição ---" else descricao
+                final_favorecido = novo_favorecido_input if favorecido == "--- Digitar Novo Favorecido ---" and novo_favorecido_input else favorecido
+                if not selected_categoria or selected_categoria == "":
+                    st.error("❌ Categoria é obrigatória!")
+                elif not descricao_final or descricao_final.strip() == "" or descricao_final == "Nenhuma descrição disponível para esta categoria":
+                    st.error("❌ Descrição é obrigatória!")
+                elif valor <= 0:
+                    st.error("❌ Valor deve ser maior que zero!")
+                elif favorecido == "--- Digitar Novo Favorecido ---" and (not novo_favorecido_input or novo_favorecido_input.strip() == ""):
+                    st.error("❌ Digite o nome do novo favorecido!")
+                else:
                     nova_despesa_dados = {
-                        "DATA": data, "CATEGORIA": selected_categoria, "DESCRIÇÃO": final_descricao,
-                        "FAVORECIDO": favorecido, "CONTA": conta, "FORMA DE PAGAMENTO": forma_pagamento,
+                        "DATA": data, "CATEGORIA": selected_categoria, "DESCRIÇÃO": descricao_final,
+                        "FAVORECIDO": final_favorecido, "CONTA": conta, "FORMA DE PAGAMENTO": forma_pagamento,
                         "VALOR": -abs(valor), "PAGO": 1 if pago else 0
                     }
-                    if self._save_expense(nova_despesa_dados):
-                        st.success("✅ Despesa salva com sucesso!")
-                        data_manager.clear_cache()
-                        st.rerun()
-                    else:
-                        st.error("❌ Erro ao salvar. Verifique se Categoria e Descrição foram preenchidas.")
+                    st.success(f"Descrição salva: {descricao_final}")
     
     def create_revenue_form(self):
         """Cria formulário para adicionar receita"""
@@ -798,5 +815,95 @@ class FormsManager:
             else:
                 st.error("Erro ao excluir um ou mais investimentos.")
 
+    def consultar_despesas(self, storage):
+        st.header("Consulta de Despesas")
+        if storage.empty:
+            st.info("Nenhuma despesa cadastrada.")
+            return
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            categorias = ["Todas"] + sorted(storage["CATEGORIA"].dropna().unique().tolist())
+            filtro_categoria = st.selectbox("Filtrar por Categoria", categorias)
+        with col2:
+            favorecidos = ["Todos"] + sorted(storage["FAVORECIDO"].dropna().unique().tolist())
+            filtro_favorecido = st.selectbox("Filtrar por Favorecido", favorecidos)
+        with col3:
+            datas = pd.to_datetime(storage["DATA"], errors="coerce")
+            data_min = datas.min().date() if not datas.isnull().all() else date.today()
+            data_max = datas.max().date() if not datas.isnull().all() else date.today()
+            filtro_data = st.date_input("Filtrar por Data", (data_min, data_max))
+
+        df_filtrado = storage.copy()
+        if filtro_categoria != "Todas":
+            df_filtrado = df_filtrado[df_filtrado["CATEGORIA"] == filtro_categoria]
+        if filtro_favorecido != "Todos":
+            df_filtrado = df_filtrado[df_filtrado["FAVORECIDO"] == filtro_favorecido]
+        if filtro_data:
+            data_ini, data_fim = filtro_data
+            datas = pd.to_datetime(df_filtrado["DATA"], errors="coerce")
+            mask = (datas >= pd.to_datetime(data_ini)) & (datas <= pd.to_datetime(data_fim))
+            df_filtrado = df_filtrado[mask]
+
+        st.dataframe(df_filtrado.reset_index(drop=True))
+        csv = df_filtrado.to_csv(index=False).encode('utf-8')
+        st.download_button("Exportar para CSV", csv, "despesas_filtradas.csv", "text/csv")
+
 # Instância global
 forms_manager = FormsManager() 
+
+# Inicialização do método de armazenamento (exemplo: DataFrame vazio)
+def init_storage():
+    """Inicializa o armazenamento das despesas (ex: DataFrame, planilha, banco de dados)."""
+    # Exemplo: DataFrame vazio com colunas padrão
+    columns = ["Data", "Categoria", "Descrição", "Favorecido", "Valor", "Forma de Pagamento", "Conta", "Pago?"]
+    return pd.DataFrame(columns=columns)
+
+def consultar_despesas(storage):
+    st.header("Consulta de Despesas")
+    if storage.empty:
+        st.info("Nenhuma despesa cadastrada.")
+        return
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        categorias = ["Todas"] + sorted(storage["CATEGORIA"].dropna().unique().tolist())
+        filtro_categoria = st.selectbox("Filtrar por Categoria", categorias)
+    with col2:
+        favorecidos = ["Todos"] + sorted(storage["FAVORECIDO"].dropna().unique().tolist())
+        filtro_favorecido = st.selectbox("Filtrar por Favorecido", favorecidos)
+    with col3:
+        datas = pd.to_datetime(storage["DATA"], errors="coerce")
+        data_min = datas.min().date() if not datas.isnull().all() else date.today()
+        data_max = datas.max().date() if not datas.isnull().all() else date.today()
+        filtro_data = st.date_input("Filtrar por Data", (data_min, data_max))
+
+    df_filtrado = storage.copy()
+    if filtro_categoria != "Todas":
+        df_filtrado = df_filtrado[df_filtrado["CATEGORIA"] == filtro_categoria]
+    if filtro_favorecido != "Todos":
+        df_filtrado = df_filtrado[df_filtrado["FAVORECIDO"] == filtro_favorecido]
+    if filtro_data:
+        data_ini, data_fim = filtro_data
+        datas = pd.to_datetime(df_filtrado["DATA"], errors="coerce")
+        mask = (datas >= pd.to_datetime(data_ini)) & (datas <= pd.to_datetime(data_fim))
+        df_filtrado = df_filtrado[mask]
+
+    st.dataframe(df_filtrado.reset_index(drop=True))
+    csv = df_filtrado.to_csv(index=False).encode('utf-8')
+    st.download_button("Exportar para CSV", csv, "despesas_filtradas.csv", "text/csv")
+
+
+def incluir_despesa(storage, dados):
+    """Inclui uma nova despesa no armazenamento."""
+    pass
+
+
+def editar_despesa(storage, id_despesa, novos_dados):
+    """Edita uma despesa existente no armazenamento."""
+    pass
+
+
+def excluir_despesa(storage, id_despesa):
+    """Exclui uma despesa do armazenamento."""
+    pass 
